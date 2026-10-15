@@ -434,3 +434,10 @@ textarea { resize: vertical; }
   .clock-time { min-width: 0; }
   .profile-btn { padding: 0.25rem; }
 }
+
+/* login: show / hide password */
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 2.9rem; }
+.password-toggle { position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); }
+.password-toggle:hover { color: var(--wine); background: var(--bg-2); }
+.password-wrap input::-ms-reveal, .password-wrap input::-ms-clear { display: none; }
