@@ -1,0 +1,16 @@
+{
+  "name": "casasaga-adminpanel",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001"
+  },
+  "dependencies": {
+    "jspdf": "4.2.1",
+    "next": "15.5.27",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  }
+}

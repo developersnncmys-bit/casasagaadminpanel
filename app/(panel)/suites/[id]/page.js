@@ -1,0 +1,161 @@
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import Icon from "@/components/Icon";
+import { DeleteButton, Field, ImageField, ImageListEditor, ListEditor, Loading, PageHeader, Toggle } from "@/components/ui";
+import { useToast } from "@/components/Toast";
+import { api, useCollection } from "@/lib/api";
+import { slugify } from "@/lib/slug";
+
+const EMPTY = {
+  id: "", name: "", mood: "", tag: "", price: "", img: "", accent: "#d8b56a", size: "", guests: "2 guests",
+  inventory: 1, blurb: "", story: "", features: [], amenities: [], gallery: [], active: true,
+};
+
+export default function SuiteEditor() {
+  const { id } = useParams();
+  const isNew = id === "new";
+  const router = useRouter();
+  const toast = useToast();
+  const { items, save, remove } = useCollection("suites");
+  const [form, setForm] = useState(isNew ? EMPTY : null);
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    if (isNew) return;
+    api(`/api/suites/${id}`).then((s) => setForm({ ...EMPTY, ...s })).catch((e) => setLoadError(e.message));
+  }, [id, isNew]);
+
+  if (!form || !items) return <Loading error={loadError} />;
+
+  const set = (k) => (e) => {
+    const v = e?.target ? e.target.value : e;
+    setForm((f) => ({ ...f, [k]: v, ...(k === "name" && isNew && !f.__idTouched ? { id: slugify(v) } : {}) }));
+    setErrors((er) => ({ ...er, [k]: undefined }));
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const err = {};
+    if (!form.name.trim()) err.name = "Give the suite a name.";
+    if (!(Number(form.price) > 0)) err.price = "Enter the nightly price.";
+    if (isNew && !slugify(form.id)) err.id = "Enter a URL name.";
+    if (isNew && items.some((s) => s.id === slugify(form.id))) err.id = "Another suite already uses this URL.";
+    if (!form.img) err.img = "Add a main photo.";
+    setErrors(err);
+    if (Object.keys(err).length) return;
+    setBusy(true);
+    try {
+      const { __idTouched, ...data } = form;
+      const saved = await save({ ...data, id: isNew ? slugify(form.id) : form.id, price: Number(form.price), inventory: Math.max(1, Number(form.inventory) || 1) }, { create: isNew });
+      toast(isNew ? `${saved.name} Suite added.` : "Suite saved.");
+      if (isNew) router.replace(`/suites/${saved.id}`);
+      else setForm({ ...EMPTY, ...saved });
+    } catch (e2) {
+      toast(e2.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit}>
+      <PageHeader title={isNew ? "Add suite" : `${form.name} Suite`} subtitle={isNew ? "A new room for the website" : `/rooms/${form.id}`}>
+        <Link href="/suites" className="btn btn-ghost">Back</Link>
+        <button className="btn btn-gold" disabled={busy}>{busy ? "Saving…" : "Save suite"}</button>
+      </PageHeader>
+
+      <div className="editor">
+        <section className="panel pad">
+          <h2 className="panel-title">Basics</h2>
+          <div className="form-grid">
+            <Field label="Name" error={errors.name} hint="Shown as “Name Suite”">
+              <input value={form.name} onChange={set("name")} placeholder="Tulum" />
+            </Field>
+            <Field label="URL name" error={errors.id} hint={isNew ? "Used in the page address" : "Can't be changed after creating"}>
+              <input value={form.id} disabled={!isNew} onChange={(e) => setForm({ ...form, id: e.target.value, __idTouched: true })} />
+            </Field>
+            <Field label="Mood / theme">
+              <input value={form.mood} onChange={set("mood")} placeholder="Boho Chic" />
+            </Field>
+            <Field label="Tag">
+              <input value={form.tag} onChange={set("tag")} placeholder="Signature Suite" />
+            </Field>
+            <Field label="Price per night (₹)" error={errors.price}>
+              <input type="number" min="0" step="1" value={form.price} onChange={set("price")} />
+            </Field>
+            <Field label="Accent colour">
+              <div className="color-field">
+                <input type="color" value={form.accent || "#d8b56a"} onChange={set("accent")} />
+                <input value={form.accent} onChange={set("accent")} />
+              </div>
+            </Field>
+            <Field label="Size">
+              <input value={form.size} onChange={set("size")} placeholder="65 sq. m." />
+            </Field>
+            <Field label="Guests">
+              <input value={form.guests} onChange={set("guests")} placeholder="2 guests" />
+            </Field>
+            <Field label="Rooms of this type" hint="How many guests can book this suite for the same night">
+              <input type="number" min="1" max="50" value={form.inventory ?? 1} onChange={set("inventory")} />
+            </Field>
+            <Field label="Short description" hint="Shown on the suites list" full>
+              <textarea rows={2} value={form.blurb} onChange={set("blurb")} />
+            </Field>
+            <Field label="Story" hint="Shown on the suite's own page" full>
+              <textarea rows={5} value={form.story} onChange={set("story")} />
+            </Field>
+          </div>
+        </section>
+
+        <aside className="editor-side">
+          <section className="panel pad">
+            <h2 className="panel-title">Visibility</h2>
+            <Toggle checked={form.active !== false} onChange={set("active")} label={form.active !== false ? "Shown on website" : "Hidden from website"} />
+          </section>
+          <section className="panel pad">
+            <h2 className="panel-title">Main photo</h2>
+            <ImageField value={form.img} onChange={set("img")} />
+            {errors.img && <em className="field-error">{errors.img}</em>}
+          </section>
+          <section className="panel pad">
+            <h2 className="panel-title">Highlights</h2>
+            <p className="muted small">Three short chips shown on the suite card</p>
+            <ListEditor value={form.features} onChange={set("features")} placeholder="Sunken private jacuzzi" />
+          </section>
+        </aside>
+
+        <section className="panel pad editor-full">
+          <h2 className="panel-title">Amenities</h2>
+          <ListEditor value={form.amenities} onChange={set("amenities")} placeholder="Rainfall shower" />
+        </section>
+
+        <section className="panel pad editor-full">
+          <h2 className="panel-title">Photo gallery</h2>
+          <p className="muted small">Shown on the suite page — first photos appear first</p>
+          <ImageListEditor value={form.gallery} onChange={set("gallery")} />
+        </section>
+
+        {!isNew && (
+          <section className="panel pad editor-full danger-zone">
+            <div>
+              <h2 className="panel-title">Delete suite</h2>
+              <p className="muted small">Removes it from the website. Existing bookings keep their record. To take it offline for a while, hide it instead.</p>
+            </div>
+            <DeleteButton
+              label="Delete suite"
+              onConfirm={async () => {
+                await remove(form.id);
+                toast("Suite deleted.");
+                router.replace("/suites");
+              }}
+            />
+          </section>
+        )}
+      </div>
+    </form>
+  );
+}
