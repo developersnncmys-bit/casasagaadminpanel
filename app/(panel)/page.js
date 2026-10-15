@@ -53,11 +53,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle={new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}>
-        <Link href="/bookings?new=1" className="btn btn-gold">
-          <Icon name="plus" size={16} /> New booking
-        </Link>
-      </PageHeader>
+      <PageHeader title="Dashboard" subtitle="Bookings, guests and website at a glance" />
 
       <section className="stats">
         {stats.map((s) => (

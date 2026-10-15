@@ -1,14 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api, getToken } from "@/lib/api";
 import { Loading } from "./ui";
+
+const AdminContext = createContext(null);
+// The signed-in admin ({ name, email, lastLoginAt }) for any panel component
+export const useAdmin = () => useContext(AdminContext);
 
 // Panel pages only render for a signed-in admin; the token is checked with the backend once per visit
 export default function AuthGuard({ children }) {
   const router = useRouter();
   const path = usePathname();
-  const [state, setState] = useState("checking");
+  const [admin, setAdmin] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -17,12 +21,12 @@ export default function AuthGuard({ children }) {
       return;
     }
     api("/api/auth/me")
-      .then(() => setState("ok"))
+      .then(setAdmin)
       .catch((e) => setError(e.message));
     // Only on first load — later 401s are handled by api()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (state !== "ok") return <Loading error={error} />;
-  return children;
+  if (!admin) return <Loading error={error} />;
+  return <AdminContext.Provider value={admin}>{children}</AdminContext.Provider>;
 }
