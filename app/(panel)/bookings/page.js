@@ -6,6 +6,7 @@ import { Badge, DeleteButton, Empty, Field, Loading, Modal, PageHeader } from "@
 import { useToast } from "@/components/Toast";
 import { api, useCollection, useSettings } from "@/lib/api";
 import { downloadInvoice } from "@/lib/invoice";
+import ShareBooking from "@/components/ShareBooking";
 import {
   BOOKING_SOURCES, BOOKING_STATUSES, HOLDING, PAYMENT_MODES, STATUS_TONE, cap, fmtDate, fmtDateTime, formatINR, sourceLabel, SOURCE_INFO,
   nightsBetween, plural, statusLabel, todayISO, waGuest,
@@ -319,6 +320,7 @@ function Row({ label, children }) {
 }
 
 function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChanged }) {
+  const [sharing, setSharing] = useState(false);
   const toast = useToast();
   const [busy, setBusy] = useState("");
   const [settle, setSettle] = useState(true);
@@ -364,6 +366,10 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
     ["Cancelled", b.cancelledAt],
   ].filter(([, t]) => t);
 
+  if (sharing) {
+    return <ShareBooking booking={b} suites={suites} onClose={() => setSharing(false)} onChanged={onChanged} />;
+  }
+
   return (
     <Modal
       wide
@@ -377,6 +383,11 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
           {b.status !== "cancelled" && (
             <button className="btn btn-ghost" onClick={invoice} disabled={!!busy}>
               <Icon name="download" size={15} /> {busy === "invoice" ? "Preparing…" : b.invoiceNo ? "Download invoice" : "Create invoice (PDF)"}
+            </button>
+          )}
+          {b.status !== "cancelled" && (
+            <button className="btn btn-gold" onClick={() => setSharing(true)} disabled={!!busy}>
+              <Icon name="external" size={15} /> Share
             </button>
           )}
           <span className="spacer" />

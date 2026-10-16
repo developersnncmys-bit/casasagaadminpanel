@@ -538,3 +538,9 @@ textarea { resize: vertical; }
 .media-video { position: relative; display: block; width: 100%; height: 100%; }
 .media-video img, .media-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .media-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8rem; padding-left: 2px; }
+
+/* share booking */
+.share-wait { display: grid; justify-items: center; gap: 0.8rem; padding: 2.4rem 0; }
+.share-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.share-note { margin: 0.9rem 0 0.6rem; }
+.share-text { font-family: ui-monospace, Consolas, monospace; font-size: 0.84rem; line-height: 1.5; background: var(--bg-2); }
