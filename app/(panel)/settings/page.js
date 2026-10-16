@@ -78,6 +78,8 @@ export default function Settings() {
         values: form.values.filter((v) => v.title.trim()),
         occasions: form.occasions.filter(Boolean),
         galleryCategories: form.galleryCategories.filter((c) => c && c !== "All"),
+        // Keep just the reel address (drop Instagram's ?tracking part)
+        reels: (form.reels || []).map((u) => u.trim().split("?")[0]).filter(Boolean),
         // A new location gets its id from its name; existing ids never change (suites point at them)
         locations: locations
           .filter((l) => l.name.trim())
@@ -115,10 +117,19 @@ export default function Settings() {
             <Field label="Google Maps link">
               <input value={form.contact.mapUrl} onChange={setContact("mapUrl")} />
             </Field>
+            <Field label="Instagram page link" hint="Shows a “Follow us on Instagram” button under the reels">
+              <input value={form.contact.instagram || ""} onChange={setContact("instagram")} placeholder="https://www.instagram.com/casasaga…" />
+            </Field>
             <Field label="Address lines" full>
               <ListEditor value={form.contact.address} onChange={setContact("address")} placeholder="Add address line" />
             </Field>
           </div>
+        </section>
+
+        <section className="panel pad settings-full">
+          <h2 className="panel-title">Instagram reels</h2>
+          <p className="muted small">Played on the home page, in this order. Paste a reel link from Instagram (Share → Copy link).</p>
+          <ListEditor value={form.reels || []} onChange={set("reels")} placeholder="https://www.instagram.com/reel/…" />
         </section>
 
         <section className="panel pad settings-full">
@@ -165,12 +176,12 @@ export default function Settings() {
             <Field label="Add-on GST (%)" hint="For decoration add-ons without their own GST %">
               <input type="number" min="0" max="100" step="0.01" value={invoice.addonTaxRate ?? 18} onChange={setInvoice("addonTaxRate")} />
             </Field>
-            <Field label="Convenience fee" hint={invoice.convenienceFeeType === "percent" ? "% of the base fee, added to every booking" : "₹ added to every booking; 0 = none"}>
+            <Field label="Convenience fee" hint={invoice.convenienceFeeType === "percent" ? "% of the total after GST, added to online bookings only" : "₹ added to each online booking; 0 = none"}>
               <div className="color-field">
                 <input type="number" min="0" step="0.01" value={invoice.convenienceFee ?? 0} onChange={setInvoice("convenienceFee")} />
                 <select value={invoice.convenienceFeeType || "fixed"} onChange={setInvoice("convenienceFeeType")} style={{ width: "auto" }}>
-                  <option value="fixed">₹ per booking</option>
-                  <option value="percent">% of base fee</option>
+                  <option value="fixed">₹ per online booking</option>
+                  <option value="percent">% of total (after GST)</option>
                 </select>
               </div>
             </Field>

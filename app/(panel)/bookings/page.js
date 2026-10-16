@@ -26,16 +26,19 @@ function bill(form, suite, pricing = {}) {
   const roomTotal = round(nights * num(form.rate));
   const addonTotal = round(form.addonItems.reduce((t, a) => t + num(a.price), 0));
   const autoTax = suite?.taxRate ?? pricing.taxRate ?? 0;
-  const autoFee = round(pricing.convenienceFeeType === "percent" ? (roomTotal * (pricing.convenienceFee || 0)) / 100 : pricing.convenienceFee || 0);
   const taxRate = form.taxRate === "" ? autoTax : num(form.taxRate);
-  const convenienceFee = form.convenienceFee === "" ? autoFee : num(form.convenienceFee);
   // GST on the stay at the suite's rate; each add-on at its own rate
-  const stayTaxable = Math.max(roomTotal + convenienceFee - num(form.discount), 0);
+  const stayTaxable = Math.max(roomTotal - num(form.discount), 0);
   const stayTaxAmount = round((stayTaxable * taxRate) / 100);
   const addonTaxAmount = round(form.addonItems.reduce((t, a) => t + (num(a.price) * (a.taxRate ?? pricing.addonTaxRate ?? 0)) / 100, 0));
   const taxAmount = round(stayTaxAmount + addonTaxAmount);
-  const taxable = stayTaxable + addonTotal;
-  const total = round(taxable + taxAmount);
+  const subtotal = round(stayTaxable + addonTotal + taxAmount);
+  // Convenience fee: only on online (website) bookings, a % of the total after GST; not taxed
+  const autoFee = form.online
+    ? round(pricing.convenienceFeeType === "percent" ? (subtotal * (pricing.convenienceFee || 0)) / 100 : pricing.convenienceFee || 0)
+    : 0;
+  const convenienceFee = form.convenienceFee === "" ? autoFee : num(form.convenienceFee);
+  const total = round(subtotal + convenienceFee);
   return { nights, roomTotal, addonTotal, convenienceFee, taxRate, stayTaxAmount, addonTaxAmount, taxAmount, total, autoTax, autoFee, balance: Math.max(round(total - num(form.amountPaid)), 0) };
 }
 
@@ -241,7 +244,7 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
           <Field label="Base fee per night (₹)" error={errors.rate}>
             <input type="number" min="0" value={form.rate} onChange={set("rate")} />
           </Field>
-          <Field label="Convenience fee (₹)" hint="Leave empty for automatic">
+          <Field label="Convenience fee (₹)" hint={form.online ? "Online booking — leave empty for automatic" : "Online bookings only; leave empty for none"}>
             <input type="number" min="0" step="0.01" value={form.convenienceFee} onChange={set("convenienceFee")} placeholder={`Auto: ${formatINR(b.autoFee)}`} />
           </Field>
           <Field label="GST (%)" hint="Leave empty for the suite's rate">
@@ -278,10 +281,10 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
       <dl className="bill">
         <dt>Base fee · {b.nights ? `${plural(b.nights, "night")} × ${formatINR(form.rate)}` : "—"}</dt><dd>{formatINR(b.roomTotal)}</dd>
         <dt>Add-ons</dt><dd>{formatINR(b.addonTotal)}</dd>
-        <dt>Convenience fee</dt><dd>{formatINR(b.convenienceFee)}</dd>
         {num(form.discount) > 0 && (<><dt>Discount</dt><dd>− {formatINR(form.discount)}</dd></>)}
         <dt>GST on stay ({b.taxRate}%)</dt><dd>{formatINR(b.stayTaxAmount)}</dd>
         <dt>GST on add-ons</dt><dd>{formatINR(b.addonTaxAmount)}</dd>
+        <dt>Convenience fee{form.online ? "" : " (online bookings only)"}</dt><dd>{formatINR(b.convenienceFee)}</dd>
         <dt className="bill-total">Total</dt><dd className="bill-total">{formatINR(b.total)}</dd>
         <dt className="bill-balance">Balance after payment</dt><dd className={`bill-balance ${b.balance > 0 ? "due" : ""}`}>{formatINR(b.balance)}</dd>
       </dl>
@@ -462,10 +465,10 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
       <dl className="bill">
         <dt>Base fee · {plural(b.nights || 0, "night")} × {formatINR(b.rate)}</dt><dd>{formatINR(b.roomTotal)}</dd>
         <dt>Add-ons</dt><dd>{formatINR(b.addonTotal)}</dd>
-        {b.convenienceFee > 0 && (<><dt>Convenience fee</dt><dd>{formatINR(b.convenienceFee)}</dd></>)}
         {b.discount > 0 && (<><dt>Discount</dt><dd>− {formatINR(b.discount)}</dd></>)}
         {b.taxAmount - (b.addonTaxAmount || 0) > 0 && (<><dt>GST on stay ({b.taxRate}%)</dt><dd>{formatINR(b.taxAmount - (b.addonTaxAmount || 0))}</dd></>)}
         {b.addonTaxAmount > 0 && (<><dt>GST on add-ons</dt><dd>{formatINR(b.addonTaxAmount)}</dd></>)}
+        {b.convenienceFee > 0 && (<><dt>Convenience fee</dt><dd>{formatINR(b.convenienceFee)}</dd></>)}
         <dt className="bill-total">Total</dt><dd className="bill-total">{formatINR(b.total)}</dd>
         <dt>Paid{mode_ && b.paymentMode ? ` (${mode_})` : ""}</dt><dd>{formatINR(b.amountPaid)}</dd>
         <dt className="bill-balance">Balance</dt><dd className={`bill-balance ${b.balance > 0 ? "due" : ""}`}>{formatINR(b.balance)}</dd>
