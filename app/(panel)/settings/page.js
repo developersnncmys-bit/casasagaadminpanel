@@ -76,6 +76,7 @@ export default function Settings() {
         contact: { ...form.contact, tel: form.contact.tel || phoneDigits, whatsapp: (form.contact.whatsapp || phoneDigits).replace(/\D/g, "") },
         policies: form.policies.filter((p) => p.label.trim()),
         values: form.values.filter((v) => v.title.trim()),
+        refundPolicy: (form.refundPolicy || []).filter((v) => (v.title || "").trim()),
         occasions: form.occasions.filter(Boolean),
         galleryCategories: form.galleryCategories.filter((c) => c && c !== "All"),
         // Keep just the reel address (drop Instagram's ?tracking part)
@@ -198,6 +199,12 @@ export default function Settings() {
           <h2 className="panel-title">House policies</h2>
           <p className="muted small">Check-in, check-out, cancellation and other rules</p>
           <PairsEditor value={form.policies} onChange={set("policies")} keys={["label", "value"]} labels={["Policy", "Details"]} />
+        </section>
+
+        <section className="panel pad settings-full">
+          <h2 className="panel-title">Cancellation &amp; refund policy</h2>
+          <p className="muted small">The website&apos;s Cancellation &amp; Refund Policy page, linked from the booking form, suite pages and footer</p>
+          <PairsEditor value={form.refundPolicy} onChange={set("refundPolicy")} keys={["title", "text"]} labels={["Heading", "Details"]} long />
         </section>
 
         <section className="panel pad">
