@@ -1,9 +1,9 @@
 "use client";
 import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
-import { DeleteButton, Empty, Field, ImageField, Loading, Modal, PageHeader } from "@/components/ui";
+import { DeleteButton, Empty, Field, ImageField, Loading, MediaPreview, Modal, PageHeader } from "@/components/ui";
 import { useToast } from "@/components/Toast";
-import { uploadImage, useCollection, useSettings } from "@/lib/api";
+import { MEDIA_ACCEPT, uploadImage, useCollection, useSettings } from "@/lib/api";
 import { byOrder, imgSrc } from "@/lib/format";
 
 function PhotoForm({ initial, categories, onSave, onDelete, onClose }) {
@@ -12,13 +12,13 @@ function PhotoForm({ initial, categories, onSave, onDelete, onClose }) {
   const set = (k) => (e) => setForm({ ...form, [k]: e?.target ? e.target.value : e });
   const submit = (e) => {
     e.preventDefault();
-    if (!form.src) return setError("Add an image.");
+    if (!form.src) return setError("Add a photo or video.");
     if (!form.alt.trim()) return setError("Describe the photo (used for accessibility and SEO).");
     onSave(form);
   };
   return (
     <Modal
-      title={form.id ? "Edit photo" : "Add photo"}
+      title={form.id ? "Edit photo / video" : "Add photo or video"}
       onClose={onClose}
       footer={
         <>
@@ -30,8 +30,8 @@ function PhotoForm({ initial, categories, onSave, onDelete, onClose }) {
       }
     >
       <form id="photo-form" onSubmit={submit} className="form-grid">
-        <Field label="Image" full>
-          <ImageField value={form.src} onChange={set("src")} />
+        <Field label="Photo or video" hint="Upload a file, or paste an image / video URL or a YouTube link" full>
+          <ImageField value={form.src} onChange={set("src")} allowVideo />
         </Field>
         <Field label="Category">
           <select value={form.cat} onChange={set("cat")}>
@@ -54,6 +54,7 @@ export default function Gallery() {
   const [cat, setCat] = useState("All");
   const [editing, setEditing] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const fileRef = useRef(null);
 
   if (!items || !settings) return <Loading error={error} />;
@@ -64,14 +65,15 @@ export default function Gallery() {
   // Bulk upload: each file becomes a photo in the current (or first) category
   const bulk = async (files) => {
     setUploading(true);
+    setProgress(0);
     let n = 0;
     try {
-      for (const f of files) {
-        const src = await uploadImage(f);
+      for (const [i, f] of files.entries()) {
+        const src = await uploadImage(f, (p) => setProgress(Math.round(((i + p / 100) / files.length) * 100)));
         await save({ src, cat: cat === "All" ? categories[0] : cat, alt: f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ") });
         n++;
       }
-      toast(`${n} photo${n === 1 ? "" : "s"} added. Check their descriptions.`);
+      toast(`${n} item${n === 1 ? "" : "s"} added. Check their descriptions.`);
     } catch (e) {
       toast(e.message, "error");
     } finally {
@@ -81,14 +83,14 @@ export default function Gallery() {
 
   return (
     <>
-      <PageHeader title="Gallery" subtitle="Photos on the website's gallery page">
+      <PageHeader title="Gallery" subtitle="Photos and videos on the website's gallery page, by category">
         <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={uploading}>
-          <Icon name="upload" size={16} /> {uploading ? "Uploading…" : "Upload photos"}
+          <Icon name="upload" size={16} /> {uploading ? `Uploading ${progress}%` : "Upload photos / videos"}
         </button>
         <input
           ref={fileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
+          accept={MEDIA_ACCEPT}
           multiple
           hidden
           onChange={(e) => {
@@ -98,7 +100,7 @@ export default function Gallery() {
           }}
         />
         <button className="btn btn-gold" onClick={() => setEditing({ src: "", cat: cat === "All" ? categories[0] : cat, alt: "" })}>
-          <Icon name="plus" size={16} /> Add photo
+          <Icon name="plus" size={16} /> Add photo / video
         </button>
       </PageHeader>
 
@@ -119,7 +121,7 @@ export default function Gallery() {
             return (
               <figure key={g.id} className="photo">
                 <button className="photo-open" onClick={() => setEditing(g)} aria-label={`Edit ${g.alt}`}>
-                  <img src={imgSrc(g.src)} alt={g.alt} loading="lazy" />
+                  <MediaPreview src={g.src} />
                 </button>
                 <figcaption>
                   <div className="clip">
@@ -140,7 +142,7 @@ export default function Gallery() {
           })}
         </div>
       ) : (
-        <Empty icon="image" title="No photos here" text="Upload photos or switch category." />
+        <Empty icon="image" title="Nothing here yet" text="Upload photos or videos, or switch category." />
       )}
 
       {editing && (

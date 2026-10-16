@@ -7,27 +7,36 @@ import { useToast } from "@/components/Toast";
 import { api, useCollection, useSettings } from "@/lib/api";
 import { downloadInvoice } from "@/lib/invoice";
 import {
-  BOOKING_SOURCES, BOOKING_STATUSES, HOLDING, PAYMENT_MODES, STATUS_TONE, cap, fmtDate, fmtDateTime, formatINR,
+  BOOKING_SOURCES, BOOKING_STATUSES, HOLDING, PAYMENT_MODES, STATUS_TONE, cap, fmtDate, fmtDateTime, formatINR, sourceLabel, SOURCE_INFO,
   nightsBetween, plural, statusLabel, todayISO, waGuest,
 } from "@/lib/format";
 
 const EMPTY = {
   name: "", phone: "", email: "", suite: "", checkIn: "", checkOut: "", guests: 2, addons: [], addonItems: [],
-  occasion: "", notes: "", status: "confirmed", source: "phone", rate: "", discount: 0, taxRate: "", amountPaid: 0, paymentMode: "",
+  occasion: "", notes: "", status: "confirmed", source: "phone", rate: "", discount: 0, taxRate: "", convenienceFee: "", amountPaid: 0, paymentMode: "",
 };
 
 const num = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v) || 0);
 const round = (n) => Math.round(n * 100) / 100;
 
-// Same sums as the backend (services/booking.service.js), for the live preview
-function bill(form) {
+// Same sums as the backend (services/booking.service.js), for the live preview.
+// An empty GST or convenience fee box means "auto": the suite's GST %, the fee from Settings.
+function bill(form, suite, pricing = {}) {
   const nights = nightsBetween(form.checkIn, form.checkOut);
   const roomTotal = round(nights * num(form.rate));
   const addonTotal = round(form.addonItems.reduce((t, a) => t + num(a.price), 0));
-  const taxable = Math.max(roomTotal + addonTotal - num(form.discount), 0);
-  const taxAmount = round((taxable * num(form.taxRate)) / 100);
+  const autoTax = suite?.taxRate ?? pricing.taxRate ?? 0;
+  const autoFee = round(pricing.convenienceFeeType === "percent" ? (roomTotal * (pricing.convenienceFee || 0)) / 100 : pricing.convenienceFee || 0);
+  const taxRate = form.taxRate === "" ? autoTax : num(form.taxRate);
+  const convenienceFee = form.convenienceFee === "" ? autoFee : num(form.convenienceFee);
+  // GST on the stay at the suite's rate; each add-on at its own rate
+  const stayTaxable = Math.max(roomTotal + convenienceFee - num(form.discount), 0);
+  const stayTaxAmount = round((stayTaxable * taxRate) / 100);
+  const addonTaxAmount = round(form.addonItems.reduce((t, a) => t + (num(a.price) * (a.taxRate ?? pricing.addonTaxRate ?? 0)) / 100, 0));
+  const taxAmount = round(stayTaxAmount + addonTaxAmount);
+  const taxable = stayTaxable + addonTotal;
   const total = round(taxable + taxAmount);
-  return { nights, roomTotal, addonTotal, taxAmount, total, balance: Math.max(round(total - num(form.amountPaid)), 0) };
+  return { nights, roomTotal, addonTotal, convenienceFee, taxRate, stayTaxAmount, addonTaxAmount, taxAmount, total, autoTax, autoFee, balance: Math.max(round(total - num(form.amountPaid)), 0) };
 }
 
 // Rooms free per suite for the chosen dates (this booking itself not counted)
@@ -46,6 +55,16 @@ function useAvailability(checkIn, checkOut, excludeId) {
   return rows;
 }
 
+// Coloured label for where a booking came from
+function SourceTag({ source }) {
+  const info = SOURCE_INFO[source || "website"] || SOURCE_INFO.other;
+  return (
+    <span className="source-tag" style={{ "--src": info.color }}>
+      {sourceLabel(source || "website")}
+    </span>
+  );
+}
+
 /* ---------- Add / edit form ---------- */
 
 function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDelete }) {
@@ -55,33 +74,39 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
     ...initial,
     occasion: initial.occasion ?? "",
     rate: initial.rate ?? suites.find((s) => s.id === initial.suite)?.price ?? "",
-    taxRate: initial.taxRate ?? (isNew ? settings.invoice?.taxRate ?? 0 : 0),
+    taxRate: initial.taxRate ?? "",
+    convenienceFee: initial.convenienceFee ?? "",
     addonItems: initial.addonItems?.length
       ? initial.addonItems
       : (initial.addons || []).map((id) => {
           const a = addons.find((x) => x.id === id);
-          return { id, title: a?.title || id, price: a?.price ?? null };
+          return { id, title: a?.title || id, price: a?.price ?? null, taxRate: a?.taxRate ?? settings.invoice?.addonTaxRate ?? 0 };
         }),
   }));
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const avail = useAvailability(form.checkIn, form.checkOut, initial.id);
-  const b = bill(form);
+  const b = bill(form, suites.find((s) => s.id === form.suite), settings.invoice);
 
   const set = (k) => (e) => {
     setForm((f) => ({ ...f, [k]: e.target.value }));
     setErrors((er) => ({ ...er, [k]: undefined }));
   };
+  // New dates bring the fee back to automatic
+  const setDate = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value, convenienceFee: "" }));
+    setErrors((er) => ({ ...er, [k]: undefined }));
+  };
   const chooseSuite = (e) => {
     const s = suites.find((x) => x.id === e.target.value);
-    // A different suite brings its own nightly price
-    setForm((f) => ({ ...f, suite: e.target.value, rate: s ? s.price : f.rate }));
+    // A different suite brings its own nightly price, GST % and fee
+    setForm((f) => ({ ...f, suite: e.target.value, rate: s ? s.price : f.rate, taxRate: "", convenienceFee: "" }));
     setErrors((er) => ({ ...er, suite: undefined }));
   };
   const toggleAddon = (a) =>
     setForm((f) => {
       const on = f.addonItems.some((x) => x.id === a.id);
-      const addonItems = on ? f.addonItems.filter((x) => x.id !== a.id) : [...f.addonItems, { id: a.id, title: a.title, price: a.price ?? null }];
+      const addonItems = on ? f.addonItems.filter((x) => x.id !== a.id) : [...f.addonItems, { id: a.id, title: a.title, price: a.price ?? null, taxRate: a.taxRate ?? settings.invoice?.addonTaxRate ?? 0 }];
       return { ...f, addonItems, addons: addonItems.map((x) => x.id) };
     });
   const setAddonPrice = (id, v) =>
@@ -110,7 +135,9 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
         guests: Number(form.guests),
         rate: num(form.rate),
         discount: num(form.discount),
-        taxRate: num(form.taxRate),
+        // "" = let the server work it out
+        taxRate: form.taxRate === "" ? "" : num(form.taxRate),
+        convenienceFee: form.convenienceFee === "" ? "" : num(form.convenienceFee),
         amountPaid: num(form.amountPaid),
         addons: form.addonItems.map((x) => x.id),
         addonItems: form.addonItems.map((x) => ({ ...x, price: x.price === null || x.price === "" ? null : Number(x.price) })),
@@ -159,10 +186,10 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
         <h3 className="form-section">Stay</h3>
         <div className="form-grid">
           <Field label="Check-in" error={errors.checkIn}>
-            <input type="date" value={form.checkIn} onChange={set("checkIn")} />
+            <input type="date" value={form.checkIn} onChange={setDate("checkIn")} />
           </Field>
           <Field label="Check-out" error={errors.checkOut}>
-            <input type="date" value={form.checkOut} min={form.checkIn || undefined} onChange={set("checkOut")} />
+            <input type="date" value={form.checkOut} min={form.checkIn || undefined} onChange={setDate("checkOut")} />
           </Field>
           <Field label="Suite" error={errors.suite} hint={avail ? "Rooms free for these dates are shown" : "Pick dates to see what's free"}>
             <select value={form.suite} onChange={chooseSuite}>
@@ -211,14 +238,17 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
 
         <h3 className="form-section">Price &amp; payment</h3>
         <div className="form-grid form-grid-3">
-          <Field label="Nightly rate (₹)" error={errors.rate}>
+          <Field label="Base fee per night (₹)" error={errors.rate}>
             <input type="number" min="0" value={form.rate} onChange={set("rate")} />
+          </Field>
+          <Field label="Convenience fee (₹)" hint="Leave empty for automatic">
+            <input type="number" min="0" step="0.01" value={form.convenienceFee} onChange={set("convenienceFee")} placeholder={`Auto: ${formatINR(b.autoFee)}`} />
+          </Field>
+          <Field label="GST (%)" hint="Leave empty for the suite's rate">
+            <input type="number" min="0" max="100" step="0.01" value={form.taxRate} onChange={set("taxRate")} placeholder={`Auto: ${b.autoTax}%`} />
           </Field>
           <Field label="Discount (₹)">
             <input type="number" min="0" value={form.discount} onChange={set("discount")} />
-          </Field>
-          <Field label="Tax / GST (%)">
-            <input type="number" min="0" max="100" step="0.01" value={form.taxRate} onChange={set("taxRate")} />
           </Field>
           <Field label="Amount paid (₹)">
             <input type="number" min="0" value={form.amountPaid} onChange={set("amountPaid")} />
@@ -233,9 +263,9 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
               {BOOKING_STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </Field>
-          <Field label="Booked via">
+          <Field label="Source (where it came from)">
             <select value={form.source} onChange={set("source")}>
-              {BOOKING_SOURCES.map((s) => <option key={s} value={s}>{cap(s)}</option>)}
+              {BOOKING_SOURCES.map((s) => <option key={s} value={s}>{sourceLabel(s)}</option>)}
             </select>
           </Field>
         </div>
@@ -244,24 +274,17 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
         <textarea rows={3} value={form.notes} onChange={set("notes")} placeholder="Special requests, arrival time…" />
       </form>
 
-      <div className="estimate">
-        <div>
-          <span className="muted">Room</span>
-          <strong>{b.nights ? `${plural(b.nights, "night")} × ${formatINR(form.rate)}` : "—"}</strong>
-        </div>
-        <div>
-          <span className="muted">Add-ons{num(form.discount) ? " − discount" : ""}{num(form.taxRate) ? " + tax" : ""}</span>
-          <strong>
-            {formatINR(b.addonTotal)}
-            {num(form.discount) ? ` − ${formatINR(form.discount)}` : ""}
-            {num(form.taxRate) ? ` + ${formatINR(b.taxAmount)}` : ""}
-          </strong>
-        </div>
-        <div className="estimate-total">
-          <span className="muted">Total · balance {formatINR(b.balance)}</span>
-          <strong>{formatINR(b.total)}</strong>
-        </div>
-      </div>
+      <h3 className="form-section">Bill (calculated automatically)</h3>
+      <dl className="bill">
+        <dt>Base fee · {b.nights ? `${plural(b.nights, "night")} × ${formatINR(form.rate)}` : "—"}</dt><dd>{formatINR(b.roomTotal)}</dd>
+        <dt>Add-ons</dt><dd>{formatINR(b.addonTotal)}</dd>
+        <dt>Convenience fee</dt><dd>{formatINR(b.convenienceFee)}</dd>
+        {num(form.discount) > 0 && (<><dt>Discount</dt><dd>− {formatINR(form.discount)}</dd></>)}
+        <dt>GST on stay ({b.taxRate}%)</dt><dd>{formatINR(b.stayTaxAmount)}</dd>
+        <dt>GST on add-ons</dt><dd>{formatINR(b.addonTaxAmount)}</dd>
+        <dt className="bill-total">Total</dt><dd className="bill-total">{formatINR(b.total)}</dd>
+        <dt className="bill-balance">Balance after payment</dt><dd className={`bill-balance ${b.balance > 0 ? "due" : ""}`}>{formatINR(b.balance)}</dd>
+      </dl>
     </Modal>
   );
 }
@@ -321,7 +344,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
     try {
       const { booking, settings: s } = await api(`/api/bookings/${b.id}/invoice`, { method: "POST", body: {} });
       onChanged(booking);
-      await downloadInvoice(booking, s);
+      await downloadInvoice(booking, s, suites.find((x) => x.id === booking.suite)?.location);
       toast(`Invoice ${booking.invoiceNo} downloaded.`);
     } catch (e) {
       toast(e.message, "error");
@@ -416,7 +439,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
             <Row label="Check-in">{fmtDate(b.checkIn)}</Row>
             <Row label="Check-out">{fmtDate(b.checkOut)}</Row>
             <Row label="Nights">{b.nights || nightsBetween(b.checkIn, b.checkOut)}</Row>
-            <Row label="Booked via">{cap(b.source)}</Row>
+            <Row label="Source"><SourceTag source={b.source} /></Row>
           </dl>
         </section>
       </div>
@@ -427,7 +450,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
           {b.addonItems.map((a) => (
             <li key={a.id}>
               <span>{a.title}</span>
-              <strong>{a.price == null ? <span className="muted">Price on request</span> : formatINR(a.price)}</strong>
+              <strong>{a.price == null ? <span className="muted">Price on request</span> : <>{formatINR(a.price)}{a.taxRate ? <span className="muted small"> + {a.taxRate}% GST</span> : null}</>}</strong>
             </li>
           ))}
         </ul>
@@ -437,10 +460,12 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
 
       <h3 className="form-section">Bill</h3>
       <dl className="bill">
-        <dt>Room · {plural(b.nights || 0, "night")} × {formatINR(b.rate)}</dt><dd>{formatINR(b.roomTotal)}</dd>
+        <dt>Base fee · {plural(b.nights || 0, "night")} × {formatINR(b.rate)}</dt><dd>{formatINR(b.roomTotal)}</dd>
         <dt>Add-ons</dt><dd>{formatINR(b.addonTotal)}</dd>
+        {b.convenienceFee > 0 && (<><dt>Convenience fee</dt><dd>{formatINR(b.convenienceFee)}</dd></>)}
         {b.discount > 0 && (<><dt>Discount</dt><dd>− {formatINR(b.discount)}</dd></>)}
-        {b.taxRate > 0 && (<><dt>Tax (GST {b.taxRate}%)</dt><dd>{formatINR(b.taxAmount)}</dd></>)}
+        {b.taxAmount - (b.addonTaxAmount || 0) > 0 && (<><dt>GST on stay ({b.taxRate}%)</dt><dd>{formatINR(b.taxAmount - (b.addonTaxAmount || 0))}</dd></>)}
+        {b.addonTaxAmount > 0 && (<><dt>GST on add-ons</dt><dd>{formatINR(b.addonTaxAmount)}</dd></>)}
         <dt className="bill-total">Total</dt><dd className="bill-total">{formatINR(b.total)}</dd>
         <dt>Paid{mode_ && b.paymentMode ? ` (${mode_})` : ""}</dt><dd>{formatINR(b.amountPaid)}</dd>
         <dt className="bill-balance">Balance</dt><dd className={`bill-balance ${b.balance > 0 ? "due" : ""}`}>{formatINR(b.balance)}</dd>
@@ -487,6 +512,7 @@ function Bookings() {
   const { settings } = useSettings();
   const [status, setStatus] = useState(params.get("status") || "all");
   const [when, setWhen] = useState("all");
+  const [source, setSource] = useState(params.get("source") || "all");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
@@ -514,13 +540,15 @@ function Bookings() {
     return items
       .filter((b) => status === "all" || b.status === status)
       .filter((b) => when === "all" || (when === "upcoming" ? b.checkOut >= today : b.checkOut < today))
+      .filter((b) => source === "all" || (b.source || "website") === source)
       .filter((b) => !term || [b.name, b.phone, b.email, b.ref, b.invoiceNo].some((v) => (v || "").toLowerCase().includes(term)))
       .sort((a, b) => (when === "upcoming" ? a.checkIn.localeCompare(b.checkIn) : (b.createdAt || "").localeCompare(a.createdAt || "")));
-  }, [items, status, when, q]);
+  }, [items, status, when, source, q]);
 
   if (!ready) return <Loading error={error} />;
 
   const suiteName = (b) => b.suiteName || suites.find((s) => s.id === b.suite)?.name || b.suite;
+  const locName = (b) => settings.locations?.find((l) => l.id === suites.find((s) => s.id === b.suite)?.location)?.name;
   const count = (s) => items.filter((b) => s === "all" || b.status === s).length;
   const replace = (saved) => {
     setItems((list) => list.map((x) => (x.id === saved.id ? saved : x)));
@@ -555,6 +583,12 @@ function Bookings() {
           ))}
         </div>
         <div className="toolbar-right">
+          <select value={source} onChange={(e) => setSource(e.target.value)} className="select-sm" aria-label="Source">
+            <option value="all">All sources</option>
+            {BOOKING_SOURCES.map((s) => (
+              <option key={s} value={s}>{sourceLabel(s)} ({items.filter((b) => (b.source || "website") === s).length})</option>
+            ))}
+          </select>
           <select value={when} onChange={(e) => setWhen(e.target.value)} className="select-sm">
             <option value="all">Any dates</option>
             <option value="upcoming">Upcoming & current</option>
@@ -585,7 +619,8 @@ function Bookings() {
                 <tr key={b.id} onClick={() => setViewing(b)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setViewing(b)}>
                   <td>
                     <span className="mono">{b.ref}</span>
-                    <div className="muted small">{fmtDateTime(b.createdAt)} · {b.source}</div>
+                    <div className="muted small">{fmtDateTime(b.createdAt)}</div>
+                    <SourceTag source={b.source} />
                   </td>
                   <td>
                     <strong>{b.name}</strong>
@@ -593,6 +628,7 @@ function Bookings() {
                   </td>
                   <td>
                     {suiteName(b)}
+                    {locName(b) && <span className="av-loc"><Icon name="pin" size={12} /> {locName(b)}</span>}
                     {b.addons?.length > 0 && <div className="muted small">+ {(b.addonItems || []).map((a) => a.title).join(", ") || `${b.addons.length} add-on(s)`}</div>}
                   </td>
                   <td>

@@ -61,6 +61,9 @@ export default function Settings() {
   const set = (k) => (v) => setForm({ ...form, [k]: v });
   const invoice = form.invoice || {};
   const setInvoice = (k) => (e) => setForm({ ...form, invoice: { ...invoice, [k]: e.target.value } });
+  const locations = form.locations || [];
+  const setLocation = (i, k, v) => setForm({ ...form, locations: locations.map((l, j) => (j === i ? { ...l, [k]: v } : l)) });
+  const addLocation = () => setForm({ ...form, locations: [...locations, { id: "", name: "", address: [], mapUrl: "", mapQuery: "" }] });
 
   const submit = async (e) => {
     e.preventDefault();
@@ -75,7 +78,11 @@ export default function Settings() {
         values: form.values.filter((v) => v.title.trim()),
         occasions: form.occasions.filter(Boolean),
         galleryCategories: form.galleryCategories.filter((c) => c && c !== "All"),
-        invoice: { ...invoice, taxRate: Number(invoice.taxRate) || 0 },
+        // A new location gets its id from its name; existing ids never change (suites point at them)
+        locations: locations
+          .filter((l) => l.name.trim())
+          .map((l) => ({ ...l, id: l.id || l.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""), address: (l.address || []).filter(Boolean) })),
+        invoice: { ...invoice, taxRate: Number(invoice.taxRate) || 0, addonTaxRate: Number(invoice.addonTaxRate ?? 18) || 0, convenienceFee: Number(invoice.convenienceFee) || 0, convenienceFeeType: invoice.convenienceFeeType || "fixed" },
       });
       toast("Settings saved.");
     } catch (err) {
@@ -115,8 +122,36 @@ export default function Settings() {
         </section>
 
         <section className="panel pad settings-full">
-          <h2 className="panel-title">Invoices</h2>
-          <p className="muted small">Printed on every booking invoice (PDF)</p>
+          <h2 className="panel-title">Locations</h2>
+          <p className="muted small">Each suite belongs to one of these. The website lets guests choose a location under Suites, and invoices use the suite&apos;s address.</p>
+          <div className="loc-edit">
+            {locations.map((l, i) => (
+              <div key={l.id || i} className="loc-card">
+                <div className="form-grid">
+                  <Field label="Name" hint={l.id ? `Web id: ${l.id}` : "e.g. JP Nagar 7th Phase"}>
+                    <input value={l.name} onChange={(e) => setLocation(i, "name", e.target.value)} />
+                  </Field>
+                  <Field label="Google Maps link" hint="Used for “Get directions”">
+                    <input value={l.mapUrl || ""} onChange={(e) => setLocation(i, "mapUrl", e.target.value)} placeholder="https://maps.app.goo.gl/…" />
+                  </Field>
+                  <Field label="Map pin" hint="Address or “latitude,longitude” for the map on the contact page">
+                    <input value={l.mapQuery || ""} onChange={(e) => setLocation(i, "mapQuery", e.target.value)} placeholder="12.8940229,77.5784378" />
+                  </Field>
+                  <Field label="Address lines" full>
+                    <ListEditor value={l.address || []} onChange={(v) => setLocation(i, "address", v)} placeholder="Add address line" />
+                  </Field>
+                </div>
+              </div>
+            ))}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={addLocation}>
+              <Icon name="plus" size={15} /> Add location
+            </button>
+          </div>
+        </section>
+
+        <section className="panel pad settings-full">
+          <h2 className="panel-title">Invoices &amp; pricing</h2>
+          <p className="muted small">GST and convenience fee are added to every booking automatically, and printed on the invoice (PDF)</p>
           <div className="form-grid">
             <Field label="Business name">
               <input value={invoice.businessName || ""} onChange={setInvoice("businessName")} />
@@ -124,8 +159,20 @@ export default function Settings() {
             <Field label="GSTIN" hint="Leave empty if not registered">
               <input value={invoice.gstin || ""} onChange={setInvoice("gstin")} placeholder="29ABCDE1234F1Z5" />
             </Field>
-            <Field label="Default tax / GST (%)" hint="Applied to new bookings; 0 = no tax line">
+            <Field label="Stay GST (%)" hint="For suites without their own GST %; 0 = no GST line">
               <input type="number" min="0" max="100" step="0.01" value={invoice.taxRate ?? 0} onChange={setInvoice("taxRate")} />
+            </Field>
+            <Field label="Add-on GST (%)" hint="For decoration add-ons without their own GST %">
+              <input type="number" min="0" max="100" step="0.01" value={invoice.addonTaxRate ?? 18} onChange={setInvoice("addonTaxRate")} />
+            </Field>
+            <Field label="Convenience fee" hint={invoice.convenienceFeeType === "percent" ? "% of the base fee, added to every booking" : "₹ added to every booking; 0 = none"}>
+              <div className="color-field">
+                <input type="number" min="0" step="0.01" value={invoice.convenienceFee ?? 0} onChange={setInvoice("convenienceFee")} />
+                <select value={invoice.convenienceFeeType || "fixed"} onChange={setInvoice("convenienceFeeType")} style={{ width: "auto" }}>
+                  <option value="fixed">₹ per booking</option>
+                  <option value="percent">% of base fee</option>
+                </select>
+              </div>
             </Field>
             <Field label="Invoice number prefix" hint={`e.g. ${invoice.prefix || "CS"}-${new Date().getFullYear()}-0001`}>
               <input value={invoice.prefix || ""} onChange={setInvoice("prefix")} />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { Badge, Loading, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
-import { BOOKING_STATUSES, EARNING, STATUS_TONE, fmtDate, fmtDateTime, formatINR, imgSrc, nightsBetween, statusLabel, todayISO } from "@/lib/format";
+import { BOOKING_STATUSES, EARNING, SOURCE_INFO, STATUS_TONE, sourceLabel, fmtDate, fmtDateTime, formatINR, imgSrc, nightsBetween, statusLabel, todayISO } from "@/lib/format";
 
 
 export default function Dashboard() {
@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const names = ["bookings", "enquiries", "suites", "addons", "gallery"];
+    const names = ["bookings", "suites", "addons", "gallery"];
     Promise.all(names.map((n) => api(`/api/${n}`)))
       .then((r) => setData(Object.fromEntries(names.map((n, i) => [n, r[i]]))))
       .catch((e) => setError(e.message));
@@ -20,7 +20,7 @@ export default function Dashboard() {
 
   if (!data) return <Loading error={error} />;
 
-  const { bookings, enquiries, suites, addons, gallery } = data;
+  const { bookings, suites, addons, gallery } = data;
   const today = todayISO();
   const month = today.slice(0, 7);
   const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
@@ -41,7 +41,6 @@ export default function Dashboard() {
       icon: "bed",
       href: "/bookings",
     },
-    { label: "New enquiries", value: enquiries.filter((e) => e.status === "new").length, icon: "mail", href: "/enquiries" },
   ];
 
   const upcoming = bookings
@@ -49,7 +48,6 @@ export default function Dashboard() {
     .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
   const inHouse = bookings.filter((b) => b.status === "checked-in");
   const recent = [...bookings].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 6);
-  const recentEnq = [...enquiries].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 4);
 
   return (
     <>
@@ -67,7 +65,7 @@ export default function Dashboard() {
         ))}
       </section>
 
-      <div className="grid-2">
+      <div>
         <section className="panel">
           <div className="panel-head">
             <h2>Arriving in the next 7 days</h2>
@@ -103,28 +101,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        <section className="panel">
-          <div className="panel-head">
-            <h2>Latest enquiries</h2>
-            <Link href="/enquiries" className="link">All enquiries</Link>
-          </div>
-          {recentEnq.length ? (
-            <ul className="rows">
-              {recentEnq.map((e) => (
-                <li key={e.id} className="row">
-                  <div className="clip">
-                    <strong>{e.name}</strong>
-                    <span className="muted small"> · {fmtDateTime(e.createdAt)}</span>
-                    <div className="muted small ellipsis">{e.message}</div>
-                  </div>
-                  <Badge tone={STATUS_TONE[e.status]}>{e.status}</Badge>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted pad">No enquiries yet.</p>
-          )}
-        </section>
+        
       </div>
 
       <section className="panel">
@@ -168,6 +145,39 @@ export default function Dashboard() {
             <Link href="/bookings?new=1" className="link">Bookings</Link>.
           </p>
         )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Where bookings come from</h2>
+          <span className="muted small">All bookings except cancelled</span>
+        </div>
+        {(() => {
+          const live = bookings.filter((b) => b.status !== "cancelled");
+          const rows = Object.entries(
+            live.reduce((acc, b) => {
+              const k = b.source || "website";
+              acc[k] = acc[k] || { count: 0, revenue: 0 };
+              acc[k].count += 1;
+              acc[k].revenue += b.total || 0;
+              return acc;
+            }, {}),
+          ).sort((a, b) => b[1].count - a[1].count);
+          const max = Math.max(1, ...rows.map(([, r]) => r.count));
+          return rows.length ? (
+            <div className="source-bars">
+              {rows.map(([src, r]) => (
+                <div key={src} className="source-bar" style={{ "--src": (SOURCE_INFO[src] || SOURCE_INFO.other).color }}>
+                  <Link href={`/bookings?source=${src}`}>{sourceLabel(src)}</Link>
+                  <div className="source-track"><div className="source-fill" style={{ width: `${(r.count / max) * 100}%` }} /></div>
+                  <span className="muted small">{r.count} booking{r.count > 1 ? "s" : ""} · {formatINR(r.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted pad">No bookings yet.</p>
+          );
+        })()}
       </section>
 
       <section className="panel">

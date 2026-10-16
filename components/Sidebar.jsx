@@ -13,7 +13,7 @@ const NAV = [
     items: [
       { href: "/bookings", label: "Bookings", icon: "calendar", count: "bookings" },
       { href: "/availability", label: "Availability", icon: "grid" },
-      { href: "/enquiries", label: "Enquiries", icon: "mail", count: "enquiries" },
+      { href: "/calendar", label: "Calendar", icon: "month" },
     ],
   },
   {
@@ -32,13 +32,11 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState({});
 
-  // Badges: pending booking requests and unread enquiries
+  // Badge: pending booking requests
   useEffect(() => {
     setOpen(false);
-    Promise.all([api("/api/bookings"), api("/api/enquiries")])
-      .then(([b, e]) =>
-        setCounts({ bookings: b.filter((x) => x.status === "pending").length, enquiries: e.filter((x) => x.status === "new").length }),
-      )
+    api("/api/bookings")
+      .then((b) => setCounts({ bookings: b.filter((x) => x.status === "pending").length }))
       .catch(() => {});
   }, [path]);
 

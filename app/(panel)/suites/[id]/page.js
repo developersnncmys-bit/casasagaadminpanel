@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { DeleteButton, Field, ImageField, ImageListEditor, ListEditor, Loading, PageHeader, Toggle } from "@/components/ui";
 import { useToast } from "@/components/Toast";
-import { api, useCollection } from "@/lib/api";
+import { api, useCollection, useSettings } from "@/lib/api";
 import { slugify } from "@/lib/slug";
 
 const EMPTY = {
@@ -19,6 +19,8 @@ export default function SuiteEditor() {
   const router = useRouter();
   const toast = useToast();
   const { items, save, remove } = useCollection("suites");
+  const { settings } = useSettings();
+  const locations = settings?.locations || [];
   const [form, setForm] = useState(isNew ? EMPTY : null);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
@@ -50,7 +52,7 @@ export default function SuiteEditor() {
     setBusy(true);
     try {
       const { __idTouched, ...data } = form;
-      const saved = await save({ ...data, id: isNew ? slugify(form.id) : form.id, price: Number(form.price), inventory: Math.max(1, Number(form.inventory) || 1) }, { create: isNew });
+      const saved = await save({ ...data, id: isNew ? slugify(form.id) : form.id, price: Number(form.price), inventory: Math.max(1, Number(form.inventory) || 1), taxRate: form.taxRate === "" || form.taxRate == null ? null : Number(form.taxRate), location: form.location || locations[0]?.id }, { create: isNew });
       toast(isNew ? `${saved.name} Suite added.` : "Suite saved.");
       if (isNew) router.replace(`/suites/${saved.id}`);
       else setForm({ ...EMPTY, ...saved });
@@ -99,8 +101,18 @@ export default function SuiteEditor() {
             <Field label="Guests">
               <input value={form.guests} onChange={set("guests")} placeholder="2 guests" />
             </Field>
+            <Field label="Location" hint="Which property this suite is at">
+              <select value={form.location || locations[0]?.id || ""} onChange={set("location")}>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </Field>
             <Field label="Rooms of this type" hint="How many guests can book this suite for the same night">
               <input type="number" min="1" max="50" value={form.inventory ?? 1} onChange={set("inventory")} />
+            </Field>
+            <Field label="GST (%)" hint="Leave empty to use the default from Contact & policies → Invoices & pricing">
+              <input type="number" min="0" max="100" step="0.01" value={form.taxRate ?? ""} onChange={set("taxRate")} placeholder="Default" />
             </Field>
             <Field label="Short description" hint="Shown on the suites list" full>
               <textarea rows={2} value={form.blurb} onChange={set("blurb")} />
@@ -115,6 +127,7 @@ export default function SuiteEditor() {
           <section className="panel pad">
             <h2 className="panel-title">Visibility</h2>
             <Toggle checked={form.active !== false} onChange={set("active")} label={form.active !== false ? "Shown on website" : "Hidden from website"} />
+            <p className="muted small">Visible suites are listed on the website. The home page shows the first three — change their order with the arrows on the Suites page.</p>
           </section>
           <section className="panel pad">
             <h2 className="panel-title">Main photo</h2>
@@ -134,8 +147,8 @@ export default function SuiteEditor() {
         </section>
 
         <section className="panel pad editor-full">
-          <h2 className="panel-title">Photo gallery</h2>
-          <p className="muted small">Shown on the suite page — first photos appear first</p>
+          <h2 className="panel-title">Photos &amp; videos</h2>
+          <p className="muted small">Shown on the suite page, first ones first. Upload photos or videos (MP4/WebM/MOV, up to 50 MB), or paste a YouTube link. The first two photos are also used at the top of the suite page.</p>
           <ImageListEditor value={form.gallery} onChange={set("gallery")} />
         </section>
 

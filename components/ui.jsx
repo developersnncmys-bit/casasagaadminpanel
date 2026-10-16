@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
-import { uploadImage } from "@/lib/api";
-import { imgSrc } from "@/lib/format";
+import { MEDIA_ACCEPT, uploadImage } from "@/lib/api";
+import { imgSrc, isVideo, videoThumb } from "@/lib/format";
 import { useToast } from "./Toast";
 
 export function PageHeader({ title, subtitle, children }) {
@@ -162,7 +162,10 @@ export function ListEditor({ value = [], onChange, placeholder = "Add item" }) {
   );
 }
 
-function useUpload(onDone) {
+const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp,image/avif";
+
+function useUpload(onDone, accept = MEDIA_ACCEPT) {
+  const [progress, setProgress] = useState(0);
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const ref = useRef(null);
@@ -171,7 +174,7 @@ function useUpload(onDone) {
     <input
       ref={ref}
       type="file"
-      accept="image/jpeg,image/png,image/webp,image/avif"
+      accept={accept}
       hidden
       multiple
       onChange={async (e) => {
@@ -179,9 +182,12 @@ function useUpload(onDone) {
         e.target.value = "";
         if (!files.length) return;
         setBusy(true);
+        setProgress(0);
         try {
           const urls = [];
-          for (const f of files) urls.push(await uploadImage(f));
+          for (const [n, f] of files.entries()) {
+            urls.push(await uploadImage(f, (p) => setProgress(Math.round(((n + p / 100) / files.length) * 100))));
+          }
           onDone(urls);
         } catch (err) {
           toast(err.message, "error");
@@ -191,19 +197,20 @@ function useUpload(onDone) {
       }}
     />
   );
-  return { busy, pick, input };
+  return { busy, pick, input, progress };
 }
 
 // One image: path/URL + upload + preview
-export function ImageField({ value, onChange }) {
-  const { busy, pick, input } = useUpload((urls) => onChange(urls[0]));
+// One photo, or (with allowVideo) a photo or video
+export function ImageField({ value, onChange, allowVideo = false }) {
+  const { busy, pick, input, progress } = useUpload((urls) => onChange(urls[0]), allowVideo ? MEDIA_ACCEPT : PHOTO_ACCEPT);
   return (
     <div className="image-field">
-      <div className="image-preview">{value ? <img src={imgSrc(value)} alt="" /> : <Icon name="image" size={26} />}</div>
+      <div className="image-preview">{value ? <MediaPreview src={value} /> : <Icon name="image" size={26} />}</div>
       <div className="image-controls">
         <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder="/images/photo.jpg or https://…" />
         <button type="button" className="btn btn-ghost btn-sm" onClick={pick} disabled={busy}>
-          <Icon name="upload" size={15} /> {busy ? "Uploading…" : "Upload image"}
+          <Icon name="upload" size={15} /> {busy ? `Uploading ${progress}%` : allowVideo ? "Upload photo or video" : "Upload photo"}
         </button>
         {input}
       </div>
@@ -213,7 +220,7 @@ export function ImageField({ value, onChange }) {
 
 // Several images (suite gallery)
 export function ImageListEditor({ value = [], onChange }) {
-  const { busy, pick, input } = useUpload((urls) => onChange([...value, ...urls]));
+  const { busy, pick, input, progress } = useUpload((urls) => onChange([...value, ...urls]));
   const [draft, setDraft] = useState("");
   const move = (i, d) => {
     const next = [...value];
@@ -225,7 +232,7 @@ export function ImageListEditor({ value = [], onChange }) {
       <div className="thumbs">
         {value.map((src, i) => (
           <figure key={src + i} className="thumb">
-            <img src={imgSrc(src)} alt="" />
+            <MediaPreview src={src} />
             <figcaption>
               <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move left">‹</button>
               <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="Remove">
@@ -237,7 +244,7 @@ export function ImageListEditor({ value = [], onChange }) {
         ))}
         <button type="button" className="thumb thumb-add" onClick={pick} disabled={busy}>
           <Icon name="upload" size={20} />
-          {busy ? "Uploading…" : "Upload"}
+          {busy ? `Uploading ${progress}%` : "Upload photo / video"}
         </button>
         {input}
       </div>
@@ -256,5 +263,17 @@ export function ImageListEditor({ value = [], onChange }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// Thumbnail for a photo, an uploaded video, or a YouTube link
+export function MediaPreview({ src }) {
+  if (!isVideo(src)) return <img src={imgSrc(src)} alt="" />;
+  const thumb = videoThumb(src);
+  return (
+    <span className="media-video">
+      {thumb ? <img src={thumb} alt="" /> : <video src={imgSrc(src)} muted playsInline preload="metadata" />}
+      <span className="media-play" aria-label="Video">▶</span>
+    </span>
   );
 }

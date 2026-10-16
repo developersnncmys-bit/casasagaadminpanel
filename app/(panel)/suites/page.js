@@ -3,12 +3,14 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { Badge, Loading, PageHeader } from "@/components/ui";
 import { useToast } from "@/components/Toast";
-import { useCollection } from "@/lib/api";
+import { useCollection, useSettings } from "@/lib/api";
 import { SITE_URL, byOrder, formatINR, imgSrc } from "@/lib/format";
 
 export default function Suites() {
   const toast = useToast();
   const { items, error, save, swap } = useCollection("suites");
+  const { settings } = useSettings();
+  const locName = (id) => settings?.locations?.find((l) => l.id === id)?.name || id;
   if (!items) return <Loading error={error} />;
   const list = [...items].sort(byOrder);
 
@@ -43,8 +45,10 @@ export default function Suites() {
                   {s.name} <em>Suite</em>
                 </h3>
                 {s.active === false && <Badge tone="bad">Hidden</Badge>}
+                {s.active !== false && list.filter((x) => x.active !== false).indexOf(s) < 3 && <Badge tone="ok">On home page</Badge>}
               </div>
               <p className="muted small">{s.mood}</p>
+              <p className="small loc-line"><Icon name="pin" size={13} /> {locName(s.location)}</p>
               <p className="price">
                 {formatINR(s.price)} <span className="muted small">/ night</span>
               </p>

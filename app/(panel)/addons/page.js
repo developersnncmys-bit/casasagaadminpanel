@@ -7,10 +7,10 @@ import { useCollection, useSettings } from "@/lib/api";
 import { byOrder, formatINR, imgSrc } from "@/lib/format";
 import { slugify } from "@/lib/slug";
 
-const EMPTY = { id: "", title: "", occasion: "", text: "", img: "", price: "", active: true };
+const EMPTY = { id: "", title: "", occasion: "", text: "", img: "", price: "", taxRate: "", active: true };
 
-function AddonForm({ initial, isNew, occasions, taken, onSave, onDelete, onClose }) {
-  const [form, setForm] = useState({ ...initial, price: initial.price ?? "" });
+function AddonForm({ initial, isNew, occasions, taken, defaultTax, onSave, onDelete, onClose }) {
+  const [form, setForm] = useState({ ...initial, price: initial.price ?? "", taxRate: initial.taxRate ?? "" });
   const [errors, setErrors] = useState({});
   const set = (k) => (e) => {
     setForm({ ...form, [k]: e?.target ? e.target.value : e });
@@ -25,7 +25,7 @@ function AddonForm({ initial, isNew, occasions, taken, onSave, onDelete, onClose
     if (!form.img) err.img = "Add a photo.";
     setErrors(err);
     if (Object.keys(err).length) return;
-    onSave({ ...form, id: isNew ? slugify(form.title) : form.id, price: form.price === "" ? null : Number(form.price) });
+    onSave({ ...form, id: isNew ? slugify(form.title) : form.id, price: form.price === "" ? null : Number(form.price), taxRate: form.taxRate === "" ? null : Number(form.taxRate) });
   };
 
   return (
@@ -48,6 +48,9 @@ function AddonForm({ initial, isNew, occasions, taken, onSave, onDelete, onClose
         </Field>
         <Field label="Price (₹)" error={errors.price} hint="Leave empty to show “Price on request”">
           <input type="number" min="0" value={form.price} onChange={set("price")} />
+        </Field>
+        <Field label="GST (%)" hint="Leave empty to use the add-on default from Contact & policies">
+          <input type="number" min="0" max="100" step="0.01" value={form.taxRate} onChange={set("taxRate")} placeholder={`Default: ${defaultTax}%`} />
         </Field>
         <Field label="Matches occasion" hint="Picked automatically in the booking form">
           <select value={form.occasion} onChange={set("occasion")}>
@@ -105,7 +108,10 @@ export default function Addons() {
                   {a.active === false && <Badge tone="bad">Hidden</Badge>}
                 </div>
                 <p className="muted small ellipsis-2">{a.text}</p>
-                <p className="price small">{a.price ? formatINR(a.price) : <span className="muted">Price on request</span>}</p>
+                <p className="price small">
+                  {a.price ? formatINR(a.price) : <span className="muted">Price on request</span>}
+                  <span className="muted small"> · {a.taxRate ?? settings.invoice?.addonTaxRate ?? 0}% GST</span>
+                </p>
                 <div className="row-actions">
                   <button className="btn btn-ghost btn-sm" onClick={() => setEditing(a)}>
                     <Icon name="edit" size={15} /> Edit
@@ -138,6 +144,7 @@ export default function Addons() {
           initial={editing}
           isNew={!editing.id}
           occasions={settings.occasions || []}
+          defaultTax={settings.invoice?.addonTaxRate ?? 18}
           taken={items.map((a) => a.id)}
           onClose={() => setEditing(null)}
           onSave={async (data) => {
