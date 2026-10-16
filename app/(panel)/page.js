@@ -110,7 +110,7 @@ export default function Dashboard() {
         </div>
         {recent.length ? (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-cards">
               <thead>
                 <tr>
                   <th>Ref</th>

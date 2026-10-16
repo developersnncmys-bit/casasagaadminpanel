@@ -617,7 +617,7 @@ function Bookings() {
 
       {list.length ? (
         <div className="panel table-wrap">
-          <table className="table table-click">
+          <table className="table table-click table-cards">
             <thead>
               <tr>
                 <th>Ref</th>

@@ -544,3 +544,144 @@ textarea { resize: vertical; }
 .share-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .share-note { margin: 0.9rem 0 0.6rem; }
 .share-text { font-family: ui-monospace, Consolas, monospace; font-size: 0.84rem; line-height: 1.5; background: var(--bg-2); }
+
+/* ---------- phones ---------- */
+@media (max-width: 860px) {
+  /* one dark bar on top: menu + logo on the left, time + profile on the right */
+  .mobile-bar { min-height: 56px; padding: 0 12px; }
+  .topbar {
+    position: fixed; top: 0; right: 0; z-index: 31; height: 56px; padding: 0 12px; gap: 0.4rem;
+    background: transparent; backdrop-filter: none; border: 0;
+  }
+  .topbar .spacer { display: none; }
+  .topbar .clock { padding: 0.3rem 0.65rem; background: rgba(255, 255, 255, 0.08); border-color: rgba(216, 181, 106, 0.25); box-shadow: none; color: #f5ebe2; font-size: 0.8rem; gap: 0.4rem; }
+  .topbar .clock .icon { color: #d8b56a; }
+  .topbar .clock-time { color: #f0d9a4; }
+  .topbar .profile-btn { padding: 0; background: transparent; border: 0; box-shadow: none; color: #f5ebe2; }
+  .topbar .profile-btn > .icon { display: none; }
+  .topbar .avatar { width: 34px; height: 34px; }
+
+  .content { padding: 1.1rem 16px 2.5rem; }
+  .page-head { margin-bottom: 1.1rem; gap: 0.8rem; }
+  .page-head h1 { font-size: 1.75rem; }
+
+  /* iOS zooms into fields under 16px — keep them at 16px */
+  input, select, textarea, .select-sm { font-size: 16px; }
+  .icon-btn { width: 36px; height: 36px; }
+
+  /* compact stat cards, two per row (an odd last one takes the full row) */
+  .stats, .av-stats { grid-template-columns: 1fr 1fr; gap: 0.7rem; margin-bottom: 1.1rem; }
+  .stats .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .stat { padding: 0.85rem 0.95rem; }
+  .stat:hover { transform: none; }
+  .stat-icon { width: 30px; height: 30px; margin-bottom: 0.35rem; }
+  .stat-value { font-size: 1.45rem; overflow-wrap: anywhere; }
+  .stat-label { font-size: 0.76rem; }
+
+  .panel { margin-bottom: 1.1rem; }
+  .panel-head { padding: 0.9rem 1rem; gap: 0.8rem; }
+  .panel-head h2, .panel-title { font-size: 1.15rem; }
+  .row { padding: 0.75rem 1rem; }
+  .pad { padding: 1rem; }
+
+  /* filter chips scroll sideways instead of wrapping onto many lines */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 16px 2px; scrollbar-width: none; max-width: calc(100% + 32px); }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { white-space: nowrap; flex-shrink: 0; }
+  .toolbar { gap: 0.7rem; margin-bottom: 1rem; }
+  .toolbar > .tabs { flex: 1 1 100%; }
+  .toolbar-right > select { flex: 1; min-width: 0; }
+  .toolbar-right .search { flex: 1 1 100%; }
+
+  /* week / month navigation */
+  .page-head .page-actions:has(.range-nav), .range-nav { width: 100%; }
+  .range-nav { flex-wrap: wrap; }
+  .range-nav .av-range, .range-nav .cal-month { flex: 1 1 60%; font-size: 1.1rem; white-space: nowrap; }
+  .range-nav input[type="date"] { flex: 1 1 40%; min-width: 0; }
+
+  /* booking lists become cards */
+  .table-wrap:has(.table-cards) { overflow: visible; }
+  .table-cards thead { display: none; }
+  .table-cards, .table-cards tbody { display: block; }
+  .table-cards tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem 0.8rem; align-items: start;
+    padding: 0.85rem 1rem; border-bottom: 1px solid var(--line-2);
+  }
+  .table-cards tbody tr:last-child { border-bottom: 0; }
+  .table-cards td { display: block; padding: 0; border: 0 !important; min-width: 0; }
+  .table-cards td:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .table-cards td:nth-child(1) .muted, .table-cards td:nth-child(1) .source-tag { display: inline-flex; margin: 0 0 0 0.5rem; }
+  .table-cards td:nth-child(6) { grid-column: 2; grid-row: 1; text-align: right; }
+  .table-cards td:nth-child(2), .table-cards td:nth-child(3) { grid-column: 1 / -1; }
+  .table-cards td:nth-child(2) strong { font-size: 1rem; }
+  .table-cards td:nth-child(3) .av-loc { display: inline-flex; margin-left: 0.4rem; }
+  .table-cards td:nth-child(4) { grid-column: 1; font-size: 0.88rem; }
+  .table-cards td:nth-child(5) { grid-column: 2; text-align: right; font-weight: 600; }
+
+  /* availability grid: slimmer suite column so more nights fit */
+  .av { min-width: 960px; }
+  .av .av-suite { width: 132px; padding: 0.55rem 0.6rem; }
+  .av-suite-inner { gap: 0.4rem; align-items: flex-start; }
+  .av-suite-inner strong { font-size: 0.82rem; }
+  .av-suite-inner .av-loc, .av-suite-inner .small { font-size: 0.66rem; }
+  .av-suite-inner .cal-dot { margin: 0.35rem 0 0; flex-shrink: 0; }
+  .av-cell { height: 52px; }
+
+  /* dashboard: source bars put the bar on its own line */
+  .source-bars { padding: 1rem; }
+  .source-bar { grid-template-columns: 1fr auto; gap: 0.35rem 0.8rem; }
+  .source-track { grid-column: 1 / -1; grid-row: 2; }
+  .suite-strip { padding: 1rem; grid-template-columns: 1fr; gap: 0.6rem; }
+  .content-counts { padding: 0 1rem 1rem; }
+
+  /* pop-ups slide up from the bottom and use the full width */
+  .modal-backdrop { padding: 0; place-items: end stretch; }
+  .modal, .modal-wide { max-width: none; width: 100%; max-height: 92dvh; border-radius: 18px 18px 0 0; border-bottom: 0; }
+  .modal-head { padding: 0.9rem 16px; }
+  .modal-head h2 { font-size: 1.25rem; }
+  .modal-body { padding: 1.1rem 16px; }
+  .modal-foot { padding: 0.8rem 16px calc(0.8rem + env(safe-area-inset-bottom)); }
+  .modal-foot .btn { flex: 1 1 auto; }
+  .details dd, .details dd a { overflow-wrap: anywhere; min-width: 0; }
+  .detail-top { flex-wrap: wrap; }
+  .detail-name { font-size: 1.45rem; }
+  .steps-bar { padding: 0.7rem; }
+  .steps-bar .btn { flex: 1; }
+  .share-actions .btn { flex: 1 1 calc(50% - 0.3rem); white-space: normal; text-align: center; }
+  .addon-list li { flex-wrap: wrap; }
+
+  /* gallery: two photos per row */
+  .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .photo figcaption { padding: 0.45rem 0.2rem 0.45rem 0.55rem; font-size: 0.78rem; }
+  .photo-actions .icon-btn { width: 26px; height: 26px; }
+
+  .thumbs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .thumb figcaption { opacity: 1; }
+  .suite-grid, .addon-grid { grid-template-columns: 1fr; gap: 1rem; }
+
+  /* long edit pages (settings, suite editor): Save stays at the bottom of the screen */
+  form:has(> .page-head > .page-actions) { padding-bottom: 4.5rem; }
+  body:has(form > .page-head > .page-actions) .toasts { bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  form > .page-head > .page-actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; justify-content: flex-end;
+    padding: 0.7rem 16px calc(0.7rem + env(safe-area-inset-bottom));
+    background: rgba(251, 248, 244, 0.96); backdrop-filter: blur(8px); border-top: 1px solid var(--line-2);
+    box-shadow: 0 -8px 24px rgba(43, 26, 31, 0.06);
+  }
+  form > .page-head > .page-actions .btn-gold { flex: 1; max-width: 260px; }
+
+  /* list editors (address lines, reels, policies): smaller arrows so the text box gets the room */
+  .list-row .icon-btn, .pair-actions .icon-btn { width: 30px; height: 30px; }
+  .list-row { gap: 0.2rem; }
+
+  .toasts { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .toast { max-width: none; }
+}
+
+@media (max-width: 380px) {
+  .topbar .clock .icon { display: none; }
+}
+@media (max-width: 330px) {
+  .stats, .av-stats { grid-template-columns: 1fr; }
+  .stats .stat:last-child:nth-child(odd) { grid-column: auto; }
+}
