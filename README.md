@@ -18,19 +18,19 @@ Sign in with the admin account created by the backend's seed (`SEED_ADMIN_EMAIL`
 | Variable | |
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | The API: `https://casasagabackend.vercel.app`, or `http://localhost:5000` for a local backend |
-| `NEXT_PUBLIC_SITE_URL` | The website. Its images (`/images/...`) are shown from here, and "View website" links to it |
+| `NEXT_PUBLIC_SITE_URL` | The website (default `https://casasagawebsite.vercel.app`). Its images (`/images/...`) are shown from here, and "View website" links to it. Use `http://localhost:3000` when running the website locally |
 
 ## Pages
 
 | Page | What it does |
 | --- | --- |
-| Dashboard | Pending requests, revenue and nights this month, arrivals in the next 7 days, latest enquiries |
+| Dashboard | Pending requests, revenue and nights this month, arrivals in the next 7 days, where bookings come from |
 | Bookings | Click a booking for everything about it: guest, stay, add-ons with prices, bill, payment, notes, timeline. **Confirm → Check in → Check out** (check-out can mark the balance paid), cancel, re-open, edit, WhatsApp or call the guest, and **download an invoice PDF** with a sequential number |
-| Availability | Two-week grid of rooms taken per suite per night. Click a free cell to book, or a full one to open the booking |
-| Enquiries | Messages from the website's Contact page. Reply on WhatsApp or email, mark replied or closed |
+| Availability | Two weeks of rooms per suite: stays as bars for one-room suites, rooms free for multi-room suites, tonight's summary |
+| Calendar | Month view of every stay; click a booking to open it, or a day to see arrivals, stays and departures |
 | Suites | Name, theme, price, **rooms of this type** (inventory), descriptions, highlights, amenities, photos, order, show/hide |
 | Add-ons | Decoration packages, with a price or "on request", photo, order, show/hide |
-| Gallery | Website gallery photos and categories, bulk upload |
+| Gallery | Website gallery photos and videos by category, bulk upload |
 | Contact & policies | Phone, WhatsApp, address, map, house policies, occasions, gallery categories, About-page values, and **invoice details** (business name, GSTIN, default GST %, number prefix, thank-you note) |
 
 Changes to website content show on the site straight away. The API tells the website to refresh.
