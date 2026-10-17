@@ -6,6 +6,7 @@ import { useToast } from "@/components/Toast";
 import { useCollection, useSettings } from "@/lib/api";
 import { byOrder, formatINR, imgSrc } from "@/lib/format";
 import { slugify } from "@/lib/slug";
+import { checkNumber, checkText, collect } from "@/lib/validate";
 
 const EMPTY = { id: "", title: "", occasion: "", text: "", img: "", price: "", taxRate: "", locations: [], active: true };
 
@@ -18,9 +19,12 @@ function AddonForm({ initial, isNew, occasions, locations = [], taken, defaultTa
   };
   const submit = (e) => {
     e.preventDefault();
-    const err = {};
-    if (!form.title.trim()) err.title = "Give the add-on a name.";
-    if (form.price !== "" && !(Number(form.price) >= 0)) err.price = "Enter a valid price or leave empty.";
+    const err = collect({
+      title: checkText(form.title, { required: true, max: 60, label: "add-on name" }),
+      price: checkNumber(form.price, { min: 0, max: 1000000, optional: true, label: "price" }),
+      taxRate: checkNumber(form.taxRate, { min: 0, max: 100, optional: true, label: "GST %" }),
+      text: checkText(form.text, { max: 400, label: "description" }),
+    });
     if (isNew && taken.includes(slugify(form.title))) err.title = "An add-on with this name already exists.";
     if (!form.img) err.img = "Add a photo.";
     setErrors(err);
@@ -49,7 +53,7 @@ function AddonForm({ initial, isNew, occasions, locations = [], taken, defaultTa
         <Field label="Price (₹)" error={errors.price} hint="Leave empty to show “Price on request”">
           <input type="number" min="0" value={form.price} onChange={set("price")} />
         </Field>
-        <Field label="GST (%)" hint="Leave empty to use the add-on default from Contact & policies">
+        <Field label="GST (%)" error={errors.taxRate} hint="Leave empty to use the add-on default from Contact & policies">
           <input type="number" min="0" max="100" step="0.01" value={form.taxRate} onChange={set("taxRate")} placeholder={`Default: ${defaultTax}%`} />
         </Field>
         <Field label="Matches occasion" hint="Picked automatically in the booking form">
@@ -81,7 +85,7 @@ function AddonForm({ initial, isNew, occasions, locations = [], taken, defaultTa
             </div>
           </Field>
         )}
-        <Field label="Description" full>
+        <Field label="Description" error={errors.text} full>
           <textarea rows={3} value={form.text} onChange={set("text")} />
         </Field>
         <Field label="Photo" error={errors.img} full>

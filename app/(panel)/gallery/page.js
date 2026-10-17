@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { DeleteButton, Empty, Field, ImageField, Loading, MediaPreview, Modal, PageHeader } from "@/components/ui";
 import { useToast } from "@/components/Toast";
+import Pagination, { usePaged } from "@/components/Pagination";
 import { MEDIA_ACCEPT, uploadImage, useCollection, useSettings } from "@/lib/api";
 import { byOrder, imgSrc } from "@/lib/format";
 
@@ -14,6 +15,8 @@ function PhotoForm({ initial, categories, onSave, onDelete, onClose }) {
     e.preventDefault();
     if (!form.src) return setError("Add a photo or video.");
     if (!form.alt.trim()) return setError("Describe the photo (used for accessibility and SEO).");
+    if (form.alt.trim().length > 120) return setError("Keep the description under 120 characters.");
+    if (!form.cat) return setError("Choose a category.");
     onSave(form);
   };
   return (
@@ -57,6 +60,8 @@ export default function Gallery() {
   const [progress, setProgress] = useState(0);
   const fileRef = useRef(null);
 
+  // 24 photos a page (hooks run before the loading check below)
+  const { rows: pageItems, pager } = usePaged(items ? [...items].sort(byOrder).filter((g) => cat === "All" || g.cat === cat) : [], { perPage: 24, resetOn: [cat] });
   if (!items || !settings) return <Loading error={error} />;
   const categories = settings.galleryCategories || [];
   const all = [...items].sort(byOrder);
@@ -115,8 +120,9 @@ export default function Gallery() {
       </div>
 
       {list.length ? (
+        <>
         <div className="photo-grid">
-          {list.map((g) => {
+          {pageItems.map((g) => {
             const i = all.indexOf(g);
             return (
               <figure key={g.id} className="photo">
@@ -141,6 +147,8 @@ export default function Gallery() {
             );
           })}
         </div>
+        <Pagination pager={pager} sizes={[24, 48, 96]} label="photos and videos" />
+        </>
       ) : (
         <Empty icon="image" title="Nothing here yet" text="Upload photos or videos, or switch category." />
       )}

@@ -705,3 +705,20 @@ textarea { resize: vertical; }
   body:has(form > .page-head > .page-actions) .toasts { bottom: 5.4rem; }
   form:has(> .page-head > .page-actions) { padding-bottom: 4rem; }
 }
+.form-problems { margin: 0 0 1.2rem; } .form-problems ul { margin: 0.4rem 0 0 1.1rem; display: grid; gap: 0.2rem; }
+
+/* pagination */
+.pager { display: flex; align-items: center; gap: 0.8rem 1.2rem; flex-wrap: wrap; margin: -0.4rem 0 1.4rem; }
+.pager-count { margin-right: auto; }
+.pager-size { display: inline-flex; align-items: center; gap: 0.5rem; }
+.pager-size select { padding: 0.35rem 0.7rem; }
+.pager-pages { display: flex; align-items: center; gap: 0.3rem; }
+.pager-btn { min-width: 34px; height: 34px; padding: 0 0.55rem; border-radius: 9px; border: 1px solid var(--line-2); background: var(--panel); font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.pager-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-2); }
+.pager-btn.on { background: var(--wine); border-color: var(--wine); color: #fff; }
+.pager-gap { padding: 0 0.2rem; color: var(--muted); }
+@media (max-width: 860px) {
+  .pager { margin-top: 0; }
+  .pager-count { flex: 1 1 100%; }
+  .pager-pages { flex: 1; justify-content: flex-end; }
+}

@@ -8,6 +8,7 @@ import { useToast } from "@/components/Toast";
 import { api, useCollection, useSettings } from "@/lib/api";
 import { slugify } from "@/lib/slug";
 import { fullName } from "@/lib/format";
+import { checkNumber, checkText, collect } from "@/lib/validate";
 
 const EMPTY = {
   id: "", name: "", mood: "", tag: "", price: "", img: "", accent: "#d8b56a", size: "", guests: "2 guests",
@@ -58,15 +59,27 @@ export default function SuiteEditor() {
 
   const submit = async (e) => {
     e.preventDefault();
-    const err = {};
-    if (!form.name.trim()) err.name = "Give the suite a name.";
-    if (!(Number(form.price) > 0)) err.price = "Enter the nightly price.";
+    const err = collect({
+      name: checkText(form.name, { required: true, max: 40, label: "suite name" }),
+      mood: checkText(form.mood, { max: 60, label: "mood" }),
+      tag: checkText(form.tag, { max: 40, label: "tag" }),
+      size: checkText(form.size, { max: 40, label: "size" }),
+      price: checkNumber(form.price, { min: 1, max: 1000000, label: "nightly price" }),
+      accent: form.accent && !/^#[0-9a-f]{6}$/i.test(form.accent) ? "Use a colour like #d8b56a." : "",
+      includedGuests: checkNumber(form.includedGuests, { min: 1, max: 10, integer: true, label: "guests included" }),
+      maxGuests: checkNumber(form.maxGuests, { min: 1, max: 10, integer: true, label: "maximum guests" }),
+      extraGuestPrice: checkNumber(form.extraGuestPrice, { min: 0, max: 100000, optional: true, label: "extra guest charge" }),
+      inventory: checkNumber(form.inventory, { min: 1, max: 50, integer: true, label: "number of rooms" }),
+      taxRate: checkNumber(form.taxRate, { min: 0, max: 100, optional: true, label: "GST %" }),
+      blurb: checkText(form.blurb, { max: 300, label: "short description" }),
+      story: checkText(form.story, { max: 2000, label: "story" }),
+    });
     if (isNew && !slugify(form.id)) err.id = "Enter a URL name.";
     if (isNew && items.some((s) => s.id === slugify(form.id))) err.id = "Another suite already uses this URL.";
     if (!form.img) err.img = "Add a main photo.";
-    if (Number(form.maxGuests) < Number(form.includedGuests)) err.maxGuests = "Can't be fewer than the guests included.";
+    if (!err.maxGuests && Number(form.maxGuests) < Number(form.includedGuests)) err.maxGuests = "Can't be fewer than the guests included.";
     setErrors(err);
-    if (Object.keys(err).length) return;
+    if (Object.keys(err).length) return toast("Please fix the highlighted fields.", "error");
     setBusy(true);
     try {
       const { __idTouched, ...data } = form;
@@ -100,31 +113,31 @@ export default function SuiteEditor() {
             <Field label="URL name" error={errors.id} hint={isNew ? "Used in the page address" : "Can't be changed after creating"}>
               <input value={form.id} disabled={!isNew} onChange={(e) => setForm({ ...form, id: e.target.value, __idTouched: true })} />
             </Field>
-            <Field label="Mood / theme">
+            <Field label="Mood / theme" error={errors.mood}>
               <input value={form.mood} onChange={set("mood")} placeholder="Boho Chic" />
             </Field>
-            <Field label="Tag">
+            <Field label="Tag" error={errors.tag}>
               <input value={form.tag} onChange={set("tag")} placeholder="Signature Suite" />
             </Field>
             <Field label="Price per night (₹)" error={errors.price}>
               <input type="number" min="0" step="1" value={form.price} onChange={set("price")} />
             </Field>
-            <Field label="Accent colour">
+            <Field label="Accent colour" error={errors.accent}>
               <div className="color-field">
                 <input type="color" value={form.accent || "#d8b56a"} onChange={set("accent")} />
                 <input value={form.accent} onChange={set("accent")} />
               </div>
             </Field>
-            <Field label="Size">
+            <Field label="Size" error={errors.size}>
               <input value={form.size} onChange={set("size")} placeholder="65 sq. m." />
             </Field>
-            <Field label="Guests included in the price" hint="The nightly price covers this many guests">
+            <Field label="Guests included in the price" error={errors.includedGuests} hint="The nightly price covers this many guests">
               <input type="number" min="1" max="10" value={form.includedGuests ?? 2} onChange={set("includedGuests")} />
             </Field>
             <Field label="Maximum guests" hint="The most guests the website lets book this suite" error={errors.maxGuests}>
               <input type="number" min="1" max="10" value={form.maxGuests ?? 4} onChange={set("maxGuests")} />
             </Field>
-            <Field label="Extra guest charge (₹ per night)" hint="For each guest over those included, plus the suite's GST">
+            <Field label="Extra guest charge (₹ per night)" error={errors.extraGuestPrice} hint="For each guest over those included, plus the suite's GST">
               <input type="number" min="0" step="1" value={form.extraGuestPrice ?? 0} onChange={set("extraGuestPrice")} />
             </Field>
             <Field label="Location" hint="Which property this suite is at">
@@ -134,16 +147,16 @@ export default function SuiteEditor() {
                 ))}
               </select>
             </Field>
-            <Field label="Rooms of this type" hint="How many guests can book this suite for the same night">
+            <Field label="Rooms of this type" error={errors.inventory} hint="How many guests can book this suite for the same night">
               <input type="number" min="1" max="50" value={form.inventory ?? 1} onChange={set("inventory")} />
             </Field>
-            <Field label="GST (%)" hint="Leave empty to use the default from Contact & policies → Invoices & pricing">
+            <Field label="GST (%)" error={errors.taxRate} hint="Leave empty to use the default from Contact & policies → Invoices & pricing">
               <input type="number" min="0" max="100" step="0.01" value={form.taxRate ?? ""} onChange={set("taxRate")} placeholder="Default" />
             </Field>
-            <Field label="Short description" hint="Shown on the suites list" full>
+            <Field label="Short description" error={errors.blurb} hint="Shown on the suites list" full>
               <textarea rows={2} value={form.blurb} onChange={set("blurb")} />
             </Field>
-            <Field label="Story" hint="Shown on the suite's own page" full>
+            <Field label="Story" error={errors.story} hint="Shown on the suite's own page" full>
               <textarea rows={5} value={form.story} onChange={set("story")} />
             </Field>
           </div>

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { Field, ListEditor, Loading, PageHeader } from "@/components/ui";
 import { useToast } from "@/components/Toast";
+import { checkGstin, checkNumber, checkPhone, checkText, checkUrl } from "@/lib/validate";
 import { useSettings } from "@/lib/api";
 
 // Edits a list of two-field rows ({label, value} policies, {title, text} values)
@@ -49,6 +50,7 @@ export default function Settings() {
   const { settings, error, save } = useSettings();
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [problems, setProblems] = useState([]);
 
   useEffect(() => {
     if (settings) setForm(settings);
@@ -65,8 +67,45 @@ export default function Settings() {
   const setLocation = (i, k, v) => setForm({ ...form, locations: locations.map((l, j) => (j === i ? { ...l, [k]: v } : l)) });
   const addLocation = () => setForm({ ...form, locations: [...locations, { id: "", name: "", address: [], mapUrl: "", mapQuery: "" }] });
 
+  // Everything wrong on the page, as "Section: message" lines shown above the form
+  const check = () => {
+    const c = form.contact || {};
+    const out = [];
+    const add = (where, msg) => msg && out.push(`${where}: ${msg}`);
+    add("Contact", checkPhone(c.phone));
+    add("Contact", c.tel && !/^\+?\d{10,13}$/.test(c.tel.replace(/[\s-]/g, "")) ? "The call link number should be digits only, e.g. +917406565065." : "");
+    add("Contact", c.whatsapp && !/^\d{10,13}$/.test(c.whatsapp.replace(/[\s-]/g, "")) ? "The WhatsApp number should be digits only with country code, e.g. 917406565065." : "");
+    add("Contact", checkUrl(c.mapUrl, { label: "Google Maps link" }));
+    add("Contact", checkUrl(c.instagram, { label: "Instagram page link", host: /(^|\.)instagram\.com$/ }));
+    (form.reels || []).forEach((u, i) => add(`Instagram reel ${i + 1}`, u.trim() && !/instagram\.com\/(reel|reels|p)\/[\w-]+/.test(u) ? "Paste a link to a reel (instagram.com/reel/…)." : ""));
+    locations.forEach((l, i) => {
+      const where = `Location ${i + 1}${l.name ? ` (${l.name})` : ""}`;
+      if (!l.name.trim() && (l.mapUrl || l.mapQuery || (l.address || []).some(Boolean))) add(where, "Give the location a name.");
+      add(where, checkUrl(l.mapUrl, { label: "Google Maps link" }));
+    });
+    const names = locations.map((l) => l.name.trim().toLowerCase()).filter(Boolean);
+    if (new Set(names).size !== names.length) add("Locations", "Two locations have the same name.");
+    add("Invoices", checkText(invoice.businessName, { required: true, max: 80, label: "business name" }));
+    add("Invoices", checkGstin(invoice.gstin));
+    add("Invoices", checkNumber(invoice.taxRate, { min: 0, max: 100, optional: true, label: "stay GST %" }));
+    add("Invoices", checkNumber(invoice.addonTaxRate, { min: 0, max: 100, optional: true, label: "add-on GST %" }));
+    add("Invoices", checkNumber(invoice.convenienceFee, { min: 0, max: invoice.convenienceFeeType === "percent" ? 100 : 100000, optional: true, label: "convenience fee" }));
+    add("Invoices", invoice.prefix && !/^[A-Z0-9-]{1,8}$/i.test(invoice.prefix) ? "The invoice number prefix should be up to 8 letters or digits." : "");
+    (form.policies || []).forEach((p) => add("House policies", p.label.trim() && !p.value.trim() ? `Add the details for “${p.label}”.` : ""));
+    [["Cancellation & refund policy", form.refundPolicy], ["House rules", form.houseRules], ["Our values", form.values]].forEach(([where, rows]) =>
+      (rows || []).forEach((r) => add(where, (r.title || "").trim() && !(r.text || "").trim() ? `Add the details for “${r.title}”.` : "")),
+    );
+    return out;
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    const found = check();
+    setProblems(found);
+    if (found.length) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return toast(found.length === 1 ? found[0] : `Please fix ${found.length} things listed at the top.`, "error");
+    }
     setBusy(true);
     try {
       const phoneDigits = form.contact.phone.replace(/[^\d+]/g, "");
@@ -102,6 +141,13 @@ export default function Settings() {
         {dirty && <span className="unsaved">Unsaved changes</span>}
         <button className="btn btn-gold" disabled={busy || !dirty}>{busy ? "Saving…" : "Save changes"}</button>
       </PageHeader>
+
+      {problems.length > 0 && (
+        <div className="warn-box form-problems" role="alert">
+          <strong>Please fix these before saving:</strong>
+          <ul>{problems.map((p) => <li key={p}>{p}</li>)}</ul>
+        </div>
+      )}
 
       <div className="settings">
         <section className="panel pad">

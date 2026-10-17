@@ -7,6 +7,8 @@ import { useToast } from "@/components/Toast";
 import { api, useCollection, useSettings } from "@/lib/api";
 import { downloadInvoice } from "@/lib/invoice";
 import ShareBooking from "@/components/ShareBooking";
+import Pagination, { usePaged } from "@/components/Pagination";
+import { checkEmail, checkName, checkNumber, checkPhone, checkText, collect } from "@/lib/validate";
 import {
   BOOKING_SOURCES, BOOKING_STATUSES, HOLDING, PAYMENT_MODES, STATUS_TONE, cap, fmtDate, fmtDateTime, formatINR, sourceLabel, SOURCE_INFO,
   fullName, nightsBetween, plural, statusLabel, todayISO, unpaidExpired, waGuest,
@@ -133,14 +135,25 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
 
   const submit = async (e) => {
     e.preventDefault();
-    const err = {};
-    if (form.name.trim().length < 2) err.name = "Enter the guest's name.";
-    if (!/^[+\d][\d\s-]{7,}$/.test(form.phone || "")) err.phone = "Enter a valid phone number.";
+    const chosen = suites.find((s) => s.id === form.suite);
+    const subtotal = b.roomTotal + (b.extraGuestTotal || 0);
+    const err = collect({
+      name: checkName(form.name, "guest's name"),
+      phone: checkPhone(form.phone),
+      email: checkEmail(form.email),
+      guests: chosen && Number(form.guests) > (chosen.maxGuests || 10) && Number(form.guests) !== Number(initial.guests) ? `The ${fullName(chosen.name)} takes up to ${chosen.maxGuests} guests.` : "",
+      rate: checkNumber(form.rate, { min: 1, max: 1000000, label: "nightly rate" }),
+      taxRate: checkNumber(form.taxRate, { min: 0, max: 100, optional: true, label: "GST %" }),
+      convenienceFee: checkNumber(form.convenienceFee, { min: 0, max: 100000, optional: true, label: "convenience fee" }),
+      discount: checkNumber(form.discount, { min: 0, max: subtotal || 0, optional: true, label: "discount" }) && (num(form.discount) < 0 ? "The discount can't be negative." : "The discount can't be more than the base fee."),
+      amountPaid: checkNumber(form.amountPaid, { min: 0, optional: true, label: "amount paid" }) || (num(form.amountPaid) > b.total + 0.01 ? `More than the total (${formatINR(b.total)}).` : ""),
+      addons: form.addonItems.some((a) => a.price !== null && a.price !== "" && !(Number(a.price) >= 0)) ? "Add-on prices must be 0 or more (or empty for “on request”)." : "",
+      notes: checkText(form.notes, { max: 1000, label: "notes" }),
+    });
     if (!form.suite) err.suite = "Choose a suite.";
     else if (full) err.suite = "This suite is fully booked for these dates.";
     if (!form.checkIn) err.checkIn = "Choose a check-in date.";
     if (!form.checkOut || b.nights < 1) err.checkOut = "Check-out must be after check-in.";
-    if (num(form.rate) <= 0) err.rate = "Enter the nightly rate.";
     setErrors(err);
     if (Object.keys(err).length) return;
     setBusy(true);
@@ -182,12 +195,12 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
         <h3 className="form-section">Guest</h3>
         <div className="form-grid">
           <Field label="Guest name" error={errors.name}>
-            <input value={form.name} onChange={set("name")} autoFocus={isNew} />
+            <input value={form.name} onChange={set("name")} autoFocus={isNew} maxLength={80} />
           </Field>
           <Field label="Phone" error={errors.phone}>
-            <input value={form.phone} onChange={set("phone")} placeholder="+91 …" />
+            <input type="tel" inputMode="tel" maxLength={16} value={form.phone} onChange={set("phone")} placeholder="10-digit mobile number" />
           </Field>
-          <Field label="Email (optional)">
+          <Field label="Email (optional)" error={errors.email} hint="The confirmation email goes here">
             <input type="email" value={form.email} onChange={set("email")} />
           </Field>
           <Field label="Occasion">
@@ -220,7 +233,7 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
               })}
             </select>
           </Field>
-          <Field label="Guests">
+          <Field label="Guests" error={errors.guests}>
             <select value={form.guests} onChange={set("guests")}>
               {Array.from({ length: Math.max(suites.find((s) => s.id === form.suite)?.maxGuests || 4, Number(form.guests) || 1) }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>{n}{n > (suites.find((s) => s.id === form.suite)?.includedGuests || 2) ? " (extra guest)" : ""}</option>
@@ -242,6 +255,7 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
             );
           })}
         </div>
+        {errors.addons && <p className="error-text">{errors.addons}</p>}
         {form.addonItems.length > 0 && (
           <div className="addon-prices">
             {form.addonItems.map((x) => (
@@ -258,16 +272,16 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
           <Field label="Base fee per night (₹)" error={errors.rate}>
             <input type="number" min="0" value={form.rate} onChange={set("rate")} />
           </Field>
-          <Field label="Convenience fee (₹)" hint={form.online ? "Online booking — leave empty for automatic" : "Online bookings only; leave empty for none"}>
+          <Field label="Convenience fee (₹)" error={errors.convenienceFee} hint={form.online ? "Online booking — leave empty for automatic" : "Online bookings only; leave empty for none"}>
             <input type="number" min="0" step="0.01" value={form.convenienceFee} onChange={set("convenienceFee")} placeholder={`Auto: ${formatINR(b.autoFee)}`} />
           </Field>
-          <Field label="GST (%)" hint="Leave empty for the suite's rate">
+          <Field label="GST (%)" error={errors.taxRate} hint="Leave empty for the suite's rate">
             <input type="number" min="0" max="100" step="0.01" value={form.taxRate} onChange={set("taxRate")} placeholder={`Auto: ${b.autoTax}%`} />
           </Field>
-          <Field label="Discount (₹)">
+          <Field label="Discount (₹)" error={errors.discount}>
             <input type="number" min="0" value={form.discount} onChange={set("discount")} />
           </Field>
-          <Field label="Amount paid (₹)">
+          <Field label="Amount paid (₹)" error={errors.amountPaid}>
             <input type="number" min="0" value={form.amountPaid} onChange={set("amountPaid")} />
           </Field>
           <Field label="Payment mode">
@@ -288,7 +302,8 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
         </div>
 
         <h3 className="form-section">Notes</h3>
-        <textarea rows={3} value={form.notes} onChange={set("notes")} placeholder="Special requests, arrival time…" />
+        <textarea rows={3} maxLength={1000} value={form.notes} onChange={set("notes")} placeholder="Special requests, arrival time…" />
+        {errors.notes && <p className="error-text">{errors.notes}</p>}
       </form>
 
       <h3 className="form-section">Bill (calculated automatically)</h3>
@@ -590,6 +605,8 @@ function Bookings() {
       .filter((b) => !term || [b.name, b.phone, b.email, b.ref, b.invoiceNo].some((v) => (v || "").toLowerCase().includes(term)))
       .sort((a, b) => (when === "upcoming" ? a.checkIn.localeCompare(b.checkIn) : (b.createdAt || "").localeCompare(a.createdAt || "")));
   }, [items, status, when, source, q]);
+  // 10 per page by default; any filter change goes back to page 1
+  const { rows: pageRows, pager } = usePaged(list, { resetOn: [status, when, source, q] });
 
   if (!ready) return <Loading error={error} />;
 
@@ -648,6 +665,7 @@ function Bookings() {
       </div>
 
       {list.length ? (
+        <>
         <div className="panel table-wrap">
           <table className="table table-click table-cards">
             <thead>
@@ -661,7 +679,7 @@ function Bookings() {
               </tr>
             </thead>
             <tbody>
-              {list.map((b) => (
+              {pageRows.map((b) => (
                 <tr key={b.id} onClick={() => setViewing(b)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setViewing(b)}>
                   <td>
                     <span className="mono">{b.ref}</span>
@@ -695,6 +713,8 @@ function Bookings() {
             </tbody>
           </table>
         </div>
+        <Pagination pager={pager} />
+        </>
       ) : (
         <Empty icon="calendar" title={items.length ? "No bookings match" : "No bookings yet"} text={items.length ? "Try another filter or search." : "Requests from the website's booking form appear here. You can also add bookings taken by phone."}>
           {!items.length && (

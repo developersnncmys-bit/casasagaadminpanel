@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
 import { api, setToken } from "@/lib/api";
+import { checkEmail } from "@/lib/validate";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -14,6 +15,8 @@ export default function LoginForm() {
 
   const submit = async (e) => {
     e.preventDefault();
+    const problem = checkEmail(form.email, { required: true }) || (!form.password ? "Enter your password." : "");
+    if (problem) return setError(problem);
     setBusy(true);
     setError("");
     try {
@@ -28,7 +31,7 @@ export default function LoginForm() {
   };
 
   return (
-    <form onSubmit={submit} className="login-form">
+    <form onSubmit={submit} className="login-form" noValidate>
       <label className="field">
         <span className="field-label">Email</span>
         <input type="email" autoComplete="username" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
