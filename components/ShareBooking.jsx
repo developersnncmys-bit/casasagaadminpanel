@@ -105,6 +105,21 @@ export default function ShareBooking({ booking, suites, onClose, onChanged }) {
       if (e.name !== "AbortError") toast("Sharing isn't available here — use WhatsApp, email or copy.", "error");
     }
   };
+  // The CasaSaga confirmation email, sent from the booking Gmail by the server
+  const [mailing, setMailing] = useState(false);
+  const sendConfirmation = async () => {
+    setMailing(true);
+    try {
+      const saved = await api(`/api/bookings/${b.id}/email`, { method: "POST", body: {} });
+      setData((d) => ({ ...d, booking: saved }));
+      onChanged(saved);
+      toast(`Confirmation emailed to ${b.email}.`);
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setMailing(false);
+    }
+  };
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
@@ -130,8 +145,13 @@ export default function ShareBooking({ booking, suites, onClose, onChanged }) {
               <Icon name="chat" size={16} /> WhatsApp {b.phone}
             </a>
             {b.email && (
+              <button className="btn btn-ghost" onClick={sendConfirmation} disabled={mailing}>
+                <Icon name="mail" size={16} /> {mailing ? "Sending…" : `Send confirmation email${b.confirmationEmailAt ? " again" : ""}`}
+              </button>
+            )}
+            {b.email && (
               <a className="btn btn-ghost" href={`mailto:${b.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`}>
-                <Icon name="mail" size={16} /> Email {b.email}
+                <Icon name="mail" size={16} /> Email this message
               </a>
             )}
             {typeof navigator !== "undefined" && navigator.share && (

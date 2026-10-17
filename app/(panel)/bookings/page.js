@@ -469,7 +469,10 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
           <dl className="details">
             <Row label="Name">{b.name}</Row>
             <Row label="Phone"><a className="link" href={`tel:${b.phone}`}>{b.phone}</a></Row>
-            <Row label="Email">{b.email && <a className="link" href={`mailto:${b.email}`}>{b.email}</a>}</Row>
+            <Row label="Email">
+              {b.email && <a className="link" href={`mailto:${b.email}`}>{b.email}</a>}
+              {b.confirmationEmailAt && <div className="muted small">Confirmation emailed {fmtDateTime(b.confirmationEmailAt)}</div>}
+            </Row>
             <Row label="Guests">{b.guests}</Row>
             <Row label="Occasion">{b.occasion}</Row>
           </dl>
