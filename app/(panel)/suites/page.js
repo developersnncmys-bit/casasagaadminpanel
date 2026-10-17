@@ -4,7 +4,7 @@ import Icon from "@/components/Icon";
 import { Badge, Loading, PageHeader } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useCollection, useSettings } from "@/lib/api";
-import { SITE_URL, byOrder, formatINR, imgSrc } from "@/lib/format";
+import { SITE_URL, byOrder, formatINR, imgSrc, nameParts } from "@/lib/format";
 
 export default function Suites() {
   const toast = useToast();
@@ -42,7 +42,7 @@ export default function Suites() {
             <div className="suite-card-body">
               <div className="suite-card-top">
                 <h3>
-                  {s.name} <em>Suite</em>
+                  {nameParts(s.name)[0]} <em>{nameParts(s.name)[1]}</em>
                 </h3>
                 {s.active === false && <Badge tone="bad">Hidden</Badge>}
                 {s.active !== false && list.filter((x) => x.active !== false).indexOf(s) < 3 && <Badge tone="ok">On home page</Badge>}

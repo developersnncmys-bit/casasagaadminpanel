@@ -7,10 +7,11 @@ import { DeleteButton, Field, ImageField, ImageListEditor, ListEditor, Loading, 
 import { useToast } from "@/components/Toast";
 import { api, useCollection, useSettings } from "@/lib/api";
 import { slugify } from "@/lib/slug";
+import { fullName } from "@/lib/format";
 
 const EMPTY = {
   id: "", name: "", mood: "", tag: "", price: "", img: "", accent: "#d8b56a", size: "", guests: "2 guests",
-  inventory: 1, blurb: "", story: "", features: [], amenities: [], gallery: [], active: true,
+  inventory: 1, includedGuests: 2, maxGuests: 4, extraGuestPrice: 0, blurb: "", story: "", features: [], amenities: [], gallery: [], active: true,
 };
 
 export default function SuiteEditor() {
@@ -25,11 +26,27 @@ export default function SuiteEditor() {
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState("");
+  // The suite as last loaded or saved — anything different hasn't reached the website yet
+  const [savedAs, setSavedAs] = useState(isNew ? JSON.stringify(EMPTY) : null);
+  const dirty = !!form && savedAs !== null && JSON.stringify(form) !== savedAs;
 
   useEffect(() => {
     if (isNew) return;
-    api(`/api/suites/${id}`).then((s) => setForm({ ...EMPTY, ...s })).catch((e) => setLoadError(e.message));
+    api(`/api/suites/${id}`)
+      .then((s) => {
+        setForm({ ...EMPTY, ...s });
+        setSavedAs(JSON.stringify({ ...EMPTY, ...s }));
+      })
+      .catch((e) => setLoadError(e.message));
   }, [id, isNew]);
+
+  // Warn before leaving with photos or changes that were never saved
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   if (!form || !items) return <Loading error={loadError} />;
 
@@ -47,13 +64,15 @@ export default function SuiteEditor() {
     if (isNew && !slugify(form.id)) err.id = "Enter a URL name.";
     if (isNew && items.some((s) => s.id === slugify(form.id))) err.id = "Another suite already uses this URL.";
     if (!form.img) err.img = "Add a main photo.";
+    if (Number(form.maxGuests) < Number(form.includedGuests)) err.maxGuests = "Can't be fewer than the guests included.";
     setErrors(err);
     if (Object.keys(err).length) return;
     setBusy(true);
     try {
       const { __idTouched, ...data } = form;
-      const saved = await save({ ...data, id: isNew ? slugify(form.id) : form.id, price: Number(form.price), inventory: Math.max(1, Number(form.inventory) || 1), taxRate: form.taxRate === "" || form.taxRate == null ? null : Number(form.taxRate), location: form.location || locations[0]?.id }, { create: isNew });
-      toast(isNew ? `${saved.name} Suite added.` : "Suite saved.");
+      const saved = await save({ ...data, id: isNew ? slugify(form.id) : form.id, price: Number(form.price), inventory: Math.max(1, Number(form.inventory) || 1), includedGuests: Math.max(1, Number(form.includedGuests) || 2), maxGuests: Math.max(1, Number(form.maxGuests) || 4), extraGuestPrice: Math.max(0, Number(form.extraGuestPrice) || 0), taxRate: form.taxRate === "" || form.taxRate == null ? null : Number(form.taxRate), location: form.location || locations[0]?.id }, { create: isNew });
+      toast(isNew ? `${fullName(saved.name)} added.` : "Suite saved.");
+      setSavedAs(JSON.stringify({ ...EMPTY, ...saved }));
       if (isNew) router.replace(`/suites/${saved.id}`);
       else setForm({ ...EMPTY, ...saved });
     } catch (e2) {
@@ -65,7 +84,8 @@ export default function SuiteEditor() {
 
   return (
     <form onSubmit={submit}>
-      <PageHeader title={isNew ? "Add suite" : `${form.name} Suite`} subtitle={isNew ? "A new room for the website" : `/rooms/${form.id}`}>
+      <PageHeader title={isNew ? "Add suite" : fullName(form.name)} subtitle={isNew ? "A new room for the website" : `/rooms/${form.id}`}>
+        {dirty && <span className="unsaved">Unsaved changes — not on the website yet</span>}
         <Link href="/suites" className="btn btn-ghost">Back</Link>
         <button className="btn btn-gold" disabled={busy}>{busy ? "Saving…" : "Save suite"}</button>
       </PageHeader>
@@ -74,7 +94,7 @@ export default function SuiteEditor() {
         <section className="panel pad">
           <h2 className="panel-title">Basics</h2>
           <div className="form-grid">
-            <Field label="Name" error={errors.name} hint="Shown as “Name Suite”">
+            <Field label="Name" error={errors.name} hint="Shown as “Name Suite” — a name ending in Flat, Room, Villa… is shown as it is">
               <input value={form.name} onChange={set("name")} placeholder="Tulum" />
             </Field>
             <Field label="URL name" error={errors.id} hint={isNew ? "Used in the page address" : "Can't be changed after creating"}>
@@ -98,8 +118,14 @@ export default function SuiteEditor() {
             <Field label="Size">
               <input value={form.size} onChange={set("size")} placeholder="65 sq. m." />
             </Field>
-            <Field label="Guests">
-              <input value={form.guests} onChange={set("guests")} placeholder="2 guests" />
+            <Field label="Guests included in the price" hint="The nightly price covers this many guests">
+              <input type="number" min="1" max="10" value={form.includedGuests ?? 2} onChange={set("includedGuests")} />
+            </Field>
+            <Field label="Maximum guests" hint="The most guests the website lets book this suite" error={errors.maxGuests}>
+              <input type="number" min="1" max="10" value={form.maxGuests ?? 4} onChange={set("maxGuests")} />
+            </Field>
+            <Field label="Extra guest charge (₹ per night)" hint="For each guest over those included, plus the suite's GST">
+              <input type="number" min="0" step="1" value={form.extraGuestPrice ?? 0} onChange={set("extraGuestPrice")} />
             </Field>
             <Field label="Location" hint="Which property this suite is at">
               <select value={form.location || locations[0]?.id || ""} onChange={set("location")}>
@@ -127,7 +153,7 @@ export default function SuiteEditor() {
           <section className="panel pad">
             <h2 className="panel-title">Visibility</h2>
             <Toggle checked={form.active !== false} onChange={set("active")} label={form.active !== false ? "Shown on website" : "Hidden from website"} />
-            <p className="muted small">Visible suites are listed on the website. The home page shows the first three — change their order with the arrows on the Suites page.</p>
+            <p className="muted small">Visible suites are listed on the website. The home page shows the suites at the first location (Contact &amp; policies → Locations), in the order set with the arrows on the Suites page.</p>
           </section>
           <section className="panel pad">
             <h2 className="panel-title">Main photo</h2>

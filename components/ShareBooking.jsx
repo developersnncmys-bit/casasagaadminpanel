@@ -5,7 +5,7 @@ import { Modal } from "./ui";
 import { useToast } from "./Toast";
 import { api, uploadImage } from "@/lib/api";
 import { downloadInvoice, invoiceFile } from "@/lib/invoice";
-import { PAYMENT_MODES, fmtDate, formatINR, plural, waGuest } from "@/lib/format";
+import { PAYMENT_MODES, fmtDate, formatINR, fullName, plural, waGuest } from "@/lib/format";
 
 const longDate = (d) =>
   d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -24,7 +24,7 @@ function bookingMessage(b, settings, location, invoiceUrl) {
     b.invoiceNo && `Invoice no: ${b.invoiceNo}`,
     `Status: ${b.status === "checked-in" ? "Checked in" : b.status[0].toUpperCase() + b.status.slice(1)}`,
     "",
-    `Suite: ${b.suiteName || b.suite} Suite`,
+    `Suite: ${fullName(b.suiteName || b.suite)}`,
     location && `Location: ${location.name}`,
     location?.address?.length && `Address: ${location.address.join(", ")}`,
     `Check-in: ${longDate(b.checkIn)}${policy("check-in") ? ` (${policy("check-in")})` : ""}`,
@@ -35,6 +35,7 @@ function bookingMessage(b, settings, location, invoiceUrl) {
     "",
     "Bill",
     `Base fee (${plural(b.nights || 0, "night")} × ${formatINR(b.rate)}): ${formatINR(b.roomTotal)}`,
+    b.extraGuestTotal > 0 && `Extra guest${b.extraGuests > 1 ? `s (${b.extraGuests})` : ""} (${plural(b.nights || 0, "night")} × ${formatINR(b.extraGuestRate)}): ${formatINR(b.extraGuestTotal)}`,
     b.addonTotal > 0 && `Add-ons: ${formatINR(b.addonTotal)}`,
     b.discount > 0 && `Discount: − ${formatINR(b.discount)}`,
     stayTax > 0 && `GST on stay (${b.taxRate}%): ${formatINR(stayTax)}`,

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { Loading, PageHeader } from "@/components/ui";
 import { useCollection, useSettings } from "@/lib/api";
-import { BOOKING_STATUSES, HOLDING, addDays, byOrder, fmtDate, formatINR, statusLabel, todayISO } from "@/lib/format";
+import { BOOKING_STATUSES, addDays, holdsRoom, byOrder, fmtDate, formatINR, statusLabel, todayISO } from "@/lib/format";
 
 const DAYS = 14;
 const weekday = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" });
@@ -27,7 +27,7 @@ export default function Availability() {
   if (!bookings || !suites) return <Loading error={error} />;
 
   const today = todayISO();
-  const holding = bookings.filter((b) => HOLDING.includes(b.status));
+  const holding = bookings.filter(holdsRoom);
   const staysOn = (suiteId, d) => holding.filter((b) => b.suite === suiteId && b.checkIn <= d && d < b.checkOut);
   const list = [...suites].sort(byOrder);
 

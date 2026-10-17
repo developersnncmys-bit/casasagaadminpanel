@@ -7,9 +7,9 @@ import { useCollection, useSettings } from "@/lib/api";
 import { byOrder, formatINR, imgSrc } from "@/lib/format";
 import { slugify } from "@/lib/slug";
 
-const EMPTY = { id: "", title: "", occasion: "", text: "", img: "", price: "", taxRate: "", active: true };
+const EMPTY = { id: "", title: "", occasion: "", text: "", img: "", price: "", taxRate: "", locations: [], active: true };
 
-function AddonForm({ initial, isNew, occasions, taken, defaultTax, onSave, onDelete, onClose }) {
+function AddonForm({ initial, isNew, occasions, locations = [], taken, defaultTax, onSave, onDelete, onClose }) {
   const [form, setForm] = useState({ ...initial, price: initial.price ?? "", taxRate: initial.taxRate ?? "" });
   const [errors, setErrors] = useState({});
   const set = (k) => (e) => {
@@ -61,6 +61,26 @@ function AddonForm({ initial, isNew, occasions, taken, defaultTax, onSave, onDel
         <Field label="Visibility">
           <Toggle checked={form.active !== false} onChange={set("active")} label={form.active !== false ? "Shown on website" : "Hidden"} />
         </Field>
+        {locations.length > 1 && (
+          <Field label="Offered at" hint="Bookings at the other locations don't see this add-on. None ticked = every location." full>
+            <div className="checks">
+              {locations.map((l) => {
+                const on = (form.locations || []).includes(l.id);
+                return (
+                  <button
+                    type="button"
+                    key={l.id}
+                    className={`check ${on ? "on" : ""}`}
+                    aria-pressed={on}
+                    onClick={() => set("locations")(on ? form.locations.filter((x) => x !== l.id) : [...(form.locations || []), l.id])}
+                  >
+                    {l.name}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        )}
         <Field label="Description" full>
           <textarea rows={3} value={form.text} onChange={set("text")} />
         </Field>
@@ -111,6 +131,9 @@ export default function Addons() {
                 <p className="price small">
                   {a.price ? formatINR(a.price) : <span className="muted">Price on request</span>}
                   <span className="muted small"> · {a.taxRate ?? settings.invoice?.addonTaxRate ?? 0}% GST</span>
+                  {a.locations?.length > 0 && (
+                    <span className="muted small"> · {a.locations.map((id) => (settings.locations || []).find((l) => l.id === id)?.name || id).join(", ")} only</span>
+                  )}
                 </p>
                 <div className="row-actions">
                   <button className="btn btn-ghost btn-sm" onClick={() => setEditing(a)}>
@@ -144,6 +167,7 @@ export default function Addons() {
           initial={editing}
           isNew={!editing.id}
           occasions={settings.occasions || []}
+          locations={settings.locations || []}
           defaultTax={settings.invoice?.addonTaxRate ?? 18}
           taken={items.map((a) => a.id)}
           onClose={() => setEditing(null)}

@@ -685,3 +685,23 @@ textarea { resize: vertical; }
   .stats, .av-stats { grid-template-columns: 1fr; }
   .stats .stat:last-child:nth-child(odd) { grid-column: auto; }
 }
+
+/* online payment (Razorpay) */
+.pay-tag { font-size: 0.72rem; font-weight: 600; margin-top: 0.25rem; }
+.pay-tag.ok, .pay-box.ok { color: var(--ok); }
+.pay-tag.warn, .pay-box.warn { color: var(--warn); }
+.pay-tag.bad, .pay-box.bad { color: var(--bad); }
+.pay-box { margin: 0 0 1rem; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid currentColor; background: color-mix(in srgb, currentColor 6%, transparent); font-size: 0.86rem; }
+.pay-box .mono { color: inherit; opacity: 0.8; }
+
+/* long edit pages (settings, suite editor): on computers Save floats bottom-right while you scroll
+   (phones get a full-width bar — see "phones" above) */
+.unsaved { color: var(--warn); font-size: 0.82rem; font-weight: 600; }
+@media (min-width: 861px) {
+  form > .page-head > .page-actions {
+    position: fixed; right: 2.4rem; bottom: 1.4rem; z-index: 25; padding: 0.5rem 0.5rem 0.5rem 1.1rem; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.97); border: 1px solid var(--line); box-shadow: 0 14px 40px rgba(43, 26, 31, 0.16);
+  }
+  body:has(form > .page-head > .page-actions) .toasts { bottom: 5.4rem; }
+  form:has(> .page-head > .page-actions) { padding-bottom: 4rem; }
+}

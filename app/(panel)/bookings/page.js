@@ -9,7 +9,7 @@ import { downloadInvoice } from "@/lib/invoice";
 import ShareBooking from "@/components/ShareBooking";
 import {
   BOOKING_SOURCES, BOOKING_STATUSES, HOLDING, PAYMENT_MODES, STATUS_TONE, cap, fmtDate, fmtDateTime, formatINR, sourceLabel, SOURCE_INFO,
-  nightsBetween, plural, statusLabel, todayISO, waGuest,
+  fullName, nightsBetween, plural, statusLabel, todayISO, unpaidExpired, waGuest,
 } from "@/lib/format";
 
 const EMPTY = {
@@ -25,11 +25,15 @@ const round = (n) => Math.round(n * 100) / 100;
 function bill(form, suite, pricing = {}) {
   const nights = nightsBetween(form.checkIn, form.checkOut);
   const roomTotal = round(nights * num(form.rate));
+  // Guests over what the suite's price covers pay its extra-guest charge each night
+  const extraGuests = Math.max(num(form.guests) - (suite?.includedGuests || 2), 0);
+  const extraGuestRate = num(form.extraGuestRate) || suite?.extraGuestPrice || 0;
+  const extraGuestTotal = round(nights * extraGuests * extraGuestRate);
   const addonTotal = round(form.addonItems.reduce((t, a) => t + num(a.price), 0));
   const autoTax = suite?.taxRate ?? pricing.taxRate ?? 0;
   const taxRate = form.taxRate === "" ? autoTax : num(form.taxRate);
   // GST on the stay at the suite's rate; each add-on at its own rate
-  const stayTaxable = Math.max(roomTotal - num(form.discount), 0);
+  const stayTaxable = Math.max(roomTotal + extraGuestTotal - num(form.discount), 0);
   const stayTaxAmount = round((stayTaxable * taxRate) / 100);
   const addonTaxAmount = round(form.addonItems.reduce((t, a) => t + (num(a.price) * (a.taxRate ?? pricing.addonTaxRate ?? 0)) / 100, 0));
   const taxAmount = round(stayTaxAmount + addonTaxAmount);
@@ -40,7 +44,7 @@ function bill(form, suite, pricing = {}) {
     : 0;
   const convenienceFee = form.convenienceFee === "" ? autoFee : num(form.convenienceFee);
   const total = round(subtotal + convenienceFee);
-  return { nights, roomTotal, addonTotal, convenienceFee, taxRate, stayTaxAmount, addonTaxAmount, taxAmount, total, autoTax, autoFee, balance: Math.max(round(total - num(form.amountPaid)), 0) };
+  return { nights, roomTotal, extraGuests, extraGuestRate, extraGuestTotal, addonTotal, convenienceFee, taxRate, stayTaxAmount, addonTaxAmount, taxAmount, total, autoTax, autoFee, balance: Math.max(round(total - num(form.amountPaid)), 0) };
 }
 
 // Rooms free per suite for the chosen dates (this booking itself not counted)
@@ -67,6 +71,13 @@ function SourceTag({ source }) {
       {sourceLabel(source || "website")}
     </span>
   );
+}
+
+// Online (Razorpay) payment state of a website booking; nothing for other bookings
+function PaymentTag({ b }) {
+  if (b.paymentStatus === "paid") return <div className="pay-tag ok">Paid online</div>;
+  if (b.paymentStatus !== "awaiting" || b.status !== "pending") return null;
+  return unpaidExpired(b) ? <div className="pay-tag bad">Payment not completed</div> : <div className="pay-tag warn">Awaiting payment</div>;
 }
 
 /* ---------- Add / edit form ---------- */
@@ -211,7 +222,9 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
           </Field>
           <Field label="Guests">
             <select value={form.guests} onChange={set("guests")}>
-              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+              {Array.from({ length: Math.max(suites.find((s) => s.id === form.suite)?.maxGuests || 4, Number(form.guests) || 1) }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>{n}{n > (suites.find((s) => s.id === form.suite)?.includedGuests || 2) ? " (extra guest)" : ""}</option>
+              ))}
             </select>
           </Field>
         </div>
@@ -281,6 +294,7 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
       <h3 className="form-section">Bill (calculated automatically)</h3>
       <dl className="bill">
         <dt>Base fee · {b.nights ? `${plural(b.nights, "night")} × ${formatINR(form.rate)}` : "—"}</dt><dd>{formatINR(b.roomTotal)}</dd>
+        {b.extraGuestTotal > 0 && (<><dt>Extra guest{b.extraGuests > 1 ? `s (${b.extraGuests})` : ""} · {plural(b.nights, "night")} × {formatINR(b.extraGuestRate)}</dt><dd>{formatINR(b.extraGuestTotal)}</dd></>)}
         <dt>Add-ons</dt><dd>{formatINR(b.addonTotal)}</dd>
         {num(form.discount) > 0 && (<><dt>Discount</dt><dd>− {formatINR(form.discount)}</dd></>)}
         <dt>GST on stay ({b.taxRate}%)</dt><dd>{formatINR(b.stayTaxAmount)}</dd>
@@ -404,11 +418,25 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
         <div>
           <div className="detail-name">{b.name}</div>
           <div className="muted small">
-            {b.suiteName || suite?.name || b.suite} Suite · {fmtDate(b.checkIn)} → {fmtDate(b.checkOut)} · {plural(b.nights || nightsBetween(b.checkIn, b.checkOut), "night")}
+            {fullName(b.suiteName || suite?.name || b.suite)} · {fmtDate(b.checkIn)} → {fmtDate(b.checkOut)} · {plural(b.nights || nightsBetween(b.checkIn, b.checkOut), "night")}
           </div>
         </div>
         <Badge tone={STATUS_TONE[b.status]}>{statusLabel(BOOKING_STATUSES, b.status)}</Badge>
       </div>
+
+      {b.paymentStatus === "paid" && (
+        <p className="pay-box ok">
+          Paid online {formatINR(b.amountPaid)} via Razorpay{b.paidAt ? ` on ${fmtDateTime(b.paidAt)}` : ""}
+          {b.razorpayPaymentId && <span className="mono"> · {b.razorpayPaymentId}</span>}
+        </p>
+      )}
+      {b.paymentStatus === "awaiting" && b.status === "pending" && (
+        <p className={`pay-box ${unpaidExpired(b) ? "bad" : "warn"}`}>
+          {unpaidExpired(b)
+            ? "The guest didn't finish paying online, so the room is no longer held. Call them to complete the booking (then Confirm it), or Cancel it."
+            : `Waiting for the guest to pay online — the room is held until ${fmtDateTime(b.holdUntil)}.`}
+        </p>
+      )}
 
       {NEXT_STEPS[b.status].length > 0 && (
         <div className="steps-bar">
@@ -449,7 +477,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
         <section>
           <h3 className="form-section">Stay</h3>
           <dl className="details">
-            <Row label="Suite">{b.suiteName || suite?.name || b.suite} Suite</Row>
+            <Row label="Suite">{fullName(b.suiteName || suite?.name || b.suite)}</Row>
             <Row label="Check-in">{fmtDate(b.checkIn)}</Row>
             <Row label="Check-out">{fmtDate(b.checkOut)}</Row>
             <Row label="Nights">{b.nights || nightsBetween(b.checkIn, b.checkOut)}</Row>
@@ -475,6 +503,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
       <h3 className="form-section">Bill</h3>
       <dl className="bill">
         <dt>Base fee · {plural(b.nights || 0, "night")} × {formatINR(b.rate)}</dt><dd>{formatINR(b.roomTotal)}</dd>
+        {b.extraGuestTotal > 0 && (<><dt>Extra guest{b.extraGuests > 1 ? `s (${b.extraGuests})` : ""} · {plural(b.nights || 0, "night")} × {formatINR(b.extraGuestRate)}</dt><dd>{formatINR(b.extraGuestTotal)}</dd></>)}
         <dt>Add-ons</dt><dd>{formatINR(b.addonTotal)}</dd>
         {b.discount > 0 && (<><dt>Discount</dt><dd>− {formatINR(b.discount)}</dd></>)}
         {b.taxAmount - (b.addonTaxAmount || 0) > 0 && (<><dt>GST on stay ({b.taxRate}%)</dt><dd>{formatINR(b.taxAmount - (b.addonTaxAmount || 0))}</dd></>)}
@@ -656,6 +685,7 @@ function Bookings() {
                   <td>
                     <Badge tone={STATUS_TONE[b.status]}>{statusLabel(BOOKING_STATUSES, b.status)}</Badge>
                     {b.invoiceNo && <div className="muted small">{b.invoiceNo}</div>}
+                    <PaymentTag b={b} />
                   </td>
                 </tr>
               ))}

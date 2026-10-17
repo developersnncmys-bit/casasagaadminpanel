@@ -4,7 +4,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { Badge, Loading, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
-import { BOOKING_STATUSES, EARNING, SOURCE_INFO, STATUS_TONE, sourceLabel, fmtDate, fmtDateTime, formatINR, imgSrc, nightsBetween, statusLabel, todayISO } from "@/lib/format";
+import { BOOKING_STATUSES, EARNING, SOURCE_INFO, STATUS_TONE, sourceLabel, fmtDate, fmtDateTime, formatINR, fullName, imgSrc, nightsBetween, statusLabel, todayISO, unpaidExpired } from "@/lib/format";
 
 
 export default function Dashboard() {
@@ -28,7 +28,7 @@ export default function Dashboard() {
 
   const earning = bookings.filter((b) => EARNING.includes(b.status));
   const stats = [
-    { label: "Pending requests", value: bookings.filter((b) => b.status === "pending").length, icon: "calendar", href: "/bookings?status=pending" },
+    { label: "Pending requests", value: bookings.filter((b) => b.status === "pending" && !unpaidExpired(b)).length, icon: "calendar", href: "/bookings?status=pending" },
     {
       label: "Revenue this month",
       value: formatINR(earning.filter((b) => (b.checkIn || "").startsWith(month)).reduce((t, b) => t + (b.total || 0), 0)),
@@ -77,7 +77,7 @@ export default function Dashboard() {
                 <li key={b.id} className="row">
                   <div>
                     <strong>{b.name}</strong>
-                    <span className="muted"> · {suiteName(b.suite)} Suite</span>
+                    <span className="muted"> · {fullName(suiteName(b.suite))}</span>
                     <div className="muted small">In house until {fmtDate(b.checkOut)}</div>
                   </div>
                   <Badge tone="info">Checked in</Badge>
@@ -87,7 +87,7 @@ export default function Dashboard() {
                 <li key={b.id} className="row">
                   <div>
                     <strong>{b.name}</strong>
-                    <span className="muted"> · {suiteName(b.suite)} Suite</span>
+                    <span className="muted"> · {fullName(suiteName(b.suite))}</span>
                     <div className="muted small">
                       {b.checkIn === today ? "Today" : fmtDate(b.checkIn)} → {fmtDate(b.checkOut)} · {b.guests} guests
                     </div>
