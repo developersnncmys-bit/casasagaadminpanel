@@ -722,3 +722,17 @@ textarea { resize: vertical; }
   .pager-count { flex: 1 1 100%; }
   .pager-pages { flex: 1; justify-content: flex-end; }
 }
+
+/* blocked dates */
+.month-day.blocked { background: repeating-linear-gradient(135deg, rgba(192, 69, 63, 0.07) 0 8px, transparent 8px 16px); }
+.block-chip { display: block; font-size: 0.68rem; font-weight: 700; color: var(--bad); padding: 0.1rem 0.3rem; border-radius: 5px; background: rgba(192, 69, 63, 0.1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.block-key { background: repeating-linear-gradient(135deg, rgba(192, 69, 63, 0.35) 0 3px, transparent 3px 6px); border: 1px solid rgba(192, 69, 63, 0.4); }
+.blocks-panel { margin-top: 1.4rem; }
+.block-list { list-style: none; display: grid; gap: 0.5rem; }
+.block-list li, .day-block { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.block-list li { padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-2); }
+.day-blocks { display: grid; gap: 0.5rem; margin: 0 0 1rem; }
+@media (max-width: 860px) { .block-chip { font-size: 0.56rem; } }
+.block-picks { display: grid; gap: 0.8rem; }
+.block-pick-group { display: grid; gap: 0.35rem; }
+.block-picks .check { display: inline-flex; flex-direction: column; align-items: flex-start; }

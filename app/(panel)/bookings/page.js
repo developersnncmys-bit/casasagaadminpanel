@@ -339,6 +339,18 @@ const NEXT_STEPS = {
   cancelled: [{ action: "reopen", label: "Re-open as pending" }],
 };
 
+// A website booking waiting for its online payment confirms itself once the guest pays — so no
+// "Confirm booking" while the payment can still come in. After the hold runs out (the guest never
+// paid) it can be confirmed by hand, e.g. when they paid another way.
+const stepsFor = (b) => {
+  if (b.status !== "pending" || b.paymentStatus !== "awaiting") return NEXT_STEPS[b.status];
+  if (!unpaidExpired(b)) return [{ action: "cancel", label: "Cancel", danger: true }];
+  return [
+    { action: "confirm", label: "Confirm (paid another way)" },
+    { action: "cancel", label: "Cancel", danger: true },
+  ];
+};
+
 function Row({ label, children }) {
   return (
     <>
@@ -453,7 +465,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
         </p>
       )}
 
-      {NEXT_STEPS[b.status].length > 0 && (
+      {stepsFor(b).length > 0 && (
         <div className="steps-bar">
           {b.status === "checked-in" && b.balance > 0 && (
             <label className="settle">
@@ -465,7 +477,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
             </label>
           )}
           <span className="spacer" />
-          {NEXT_STEPS[b.status].map((s) => (
+          {stepsFor(b).map((s) => (
             <button
               key={s.action}
               className={`btn ${s.primary ? "btn-gold" : s.danger ? "btn-danger" : "btn-ghost"}`}

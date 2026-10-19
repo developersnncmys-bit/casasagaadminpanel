@@ -2,7 +2,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
-import { Badge, Loading, Modal, PageHeader } from "@/components/ui";
+import BlockForm, { blockCovers, blockDates, blockLabel } from "@/components/BlockForm";
+import { Badge, DeleteButton, Loading, Modal, PageHeader } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import { useCollection, useSettings } from "@/lib/api";
 import { BOOKING_STATUSES, STATUS_TONE, addDays, byOrder, fmtDate, formatINR, statusLabel, todayISO } from "@/lib/format";
 
@@ -32,6 +34,11 @@ export default function Calendar() {
   const { items: bookings, error } = useCollection("bookings");
   const { items: suites } = useCollection("suites");
   const { settings } = useSettings();
+  const { items: loadedBlocks, error: blocksError, save: saveBlock, remove: removeBlock } = useCollection("blocks");
+  // If blocked dates can't be loaded (e.g. an older server), the calendar still opens without them
+  const blocks = loadedBlocks || (blocksError ? [] : null);
+  const toast = useToast();
+  const [blocking, setBlocking] = useState(null); // the Block dates form's starting values
   const [ym, setYm] = useState(monthKey(todayISO()));
   const [suite, setSuite] = useState("all");
   const [showCancelled, setShowCancelled] = useState(false);
@@ -39,7 +46,7 @@ export default function Calendar() {
 
   const grid = useMemo(() => monthGrid(ym), [ym]);
 
-  if (!bookings || !suites) return <Loading error={error} />;
+  if (!bookings || !suites || !blocks) return <Loading error={error} />;
 
   const today = todayISO();
   const accent = (id) => suites.find((s) => s.id === id)?.accent || "#b8892f";
@@ -55,6 +62,16 @@ export default function Calendar() {
     leaving: list.filter((b) => b.checkOut === d),
   });
 
+  // Blocked dates that touch the suites in view (all / a location / one suite)
+  const shownSuites = suites.filter((s) => suite === "all" || (suite.startsWith("loc:") ? s.location === suite.slice(4) : s.id === suite));
+  const blocksOn = (d) => blocks.filter((b) => b.from <= d && d <= b.to && shownSuites.some((s) => blockCovers(b, s)));
+  const locations = settings?.locations || [];
+  const upcoming = [...blocks].filter((b) => b.to >= today).sort((a, b) => a.from.localeCompare(b.from));
+  const unblock = async (b) => {
+    await removeBlock(b.id);
+    toast(`Unblocked ${blockDates(b)}.`);
+  };
+
   const inMonth = list.filter((b) => b.checkIn <= `${ym}-31` && b.checkOut > `${ym}-01`);
   const open = (b) => router.push(`/bookings?open=${b.id}`);
 
@@ -67,6 +84,9 @@ export default function Calendar() {
           <button className="icon-btn" onClick={() => setYm(shiftMonth(ym, 1))} aria-label="Next month">›</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setYm(monthKey(today))}>Today</button>
         </div>
+        <button className="btn btn-gold" onClick={() => setBlocking({ scope: suite })} disabled={!!blocksError} title={blocksError ? "Blocked dates aren't available on the server yet" : undefined}>
+          <Icon name="x" size={15} /> Block dates
+        </button>
       </PageHeader>
 
       <div className="toolbar">
@@ -100,10 +120,11 @@ export default function Calendar() {
         {grid.map((d) => {
           const { staying, arriving, leaving } = onDay(d);
           const outside = monthKey(d) !== ym;
+          const closed = blocksOn(d);
           return (
             <div
               key={d}
-              className={`month-day ${outside ? "outside" : ""} ${d === today ? "is-today" : ""}`}
+              className={`month-day ${outside ? "outside" : ""} ${d === today ? "is-today" : ""} ${closed.length ? "blocked" : ""}`}
               onClick={() => setDay(d)}
               role="button"
               tabIndex={0}
@@ -119,6 +140,11 @@ export default function Calendar() {
                   </span>
                 )}
               </div>
+              {closed.length > 0 && (
+                <span className="block-chip" title={closed.map((b) => `${blockLabel(b, suites, locations)}${b.reason ? ` — ${b.reason}` : ""}`).join("\n")}>
+                  ⛔ Blocked{closed.length === 1 && (closed[0].suites?.length || closed[0].location) ? ` · ${blockLabel(closed[0], suites, locations)}` : ""}
+                </span>
+              )}
               {staying.slice(0, MAX_CHIPS).map((b) => (
                 <button
                   key={b.id}
@@ -144,8 +170,43 @@ export default function Calendar() {
         <span>▸ Check-in day</span>
         <span>↘ arrivals · ↗ departures</span>
         <span><i className="cal-key" style={{ background: "repeating-linear-gradient(45deg, #b8892f55 0 4px, transparent 4px 8px)" }} /> Pending</span>
+        <span><i className="cal-key block-key" /> Blocked — not bookable</span>
         <span className="muted">Chip colour = suite</span>
       </div>
+
+      <section className="panel pad blocks-panel">
+        <h2 className="panel-title">Blocked dates</h2>
+        <p className="muted small">Nights closed to bookings on the website and here. Click a day in the calendar, or use Block dates.</p>
+        {upcoming.length ? (
+          <ul className="block-list">
+            {upcoming.map((b) => (
+              <li key={b.id}>
+                <span className="clip">
+                  <strong>{blockDates(b)}</strong>
+                  <span className="muted small"> · {blockLabel(b, suites, locations)}{b.reason ? ` · ${b.reason}` : ""}</span>
+                </span>
+                <DeleteButton small label="Unblock" onConfirm={() => unblock(b)} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">No dates blocked.</p>
+        )}
+      </section>
+
+      {blocking && (
+        <BlockForm
+          initial={blocking}
+          suites={suites}
+          locations={locations}
+          onClose={() => setBlocking(null)}
+          onSave={async (data) => {
+            const saved = await saveBlock(data);
+            setBlocking(null);
+            toast(`Blocked ${blockDates(saved)} · ${blockLabel(saved, suites, locations)}.`);
+          }}
+        />
+      )}
 
       {day && (
         <Modal title={dayLong(day)} onClose={() => setDay(null)}>
@@ -178,12 +239,25 @@ export default function Calendar() {
             );
             return (
               <>
+                {blocksOn(day).length > 0 && (
+                  <div className="warn-box day-blocks">
+                    {blocksOn(day).map((b) => (
+                      <div key={b.id} className="day-block">
+                        <span>⛔ <strong>Blocked</strong> · {blockLabel(b, suites, locations)} · {blockDates(b)}{b.reason ? ` · ${b.reason}` : ""}</span>
+                        <DeleteButton small label="Unblock" onConfirm={() => unblock(b)} />
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {section(`Arriving (${arriving.length})`, arriving, "No arrivals.")}
                 {section(`Staying tonight (${staying.length})`, staying, "Nobody staying tonight.")}
                 {section(`Leaving (${leaving.length})`, leaving, "No departures.")}
                 <div className="row-actions">
                   <button className="btn btn-gold btn-sm" onClick={() => router.push(`/bookings?new=1&checkIn=${day}${suite !== "all" && !suite.startsWith("loc:") ? `&suite=${suite}` : ""}`)}>
                     <Icon name="plus" size={15} /> New booking from this day
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setBlocking({ from: day, to: day, scope: suite }); setDay(null); }}>
+                    <Icon name="x" size={15} /> Block this day
                   </button>
                 </div>
               </>
