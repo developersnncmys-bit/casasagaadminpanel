@@ -538,7 +538,7 @@ function BookingDetail({ booking: b, suites, settings, onClose, onEdit, onChange
         <dt>Base fee · {plural(b.nights || 0, "night")} × {formatINR(b.rate)}</dt><dd>{formatINR(b.roomTotal)}</dd>
         {b.extraGuestTotal > 0 && (<><dt>Extra guest{b.extraGuests > 1 ? `s (${b.extraGuests})` : ""} · {plural(b.nights || 0, "night")} × {formatINR(b.extraGuestRate)}</dt><dd>{formatINR(b.extraGuestTotal)}</dd></>)}
         <dt>Add-ons</dt><dd>{formatINR(b.addonTotal)}</dd>
-        {b.discount > 0 && (<><dt>Discount</dt><dd>− {formatINR(b.discount)}</dd></>)}
+        {b.discount > 0 && (<><dt>Discount{b.discountNote ? ` · ${b.discountNote}` : ""}</dt><dd>− {formatINR(b.discount)}</dd></>)}
         {b.taxAmount - (b.addonTaxAmount || 0) > 0 && (<><dt>GST on stay ({b.taxRate}%)</dt><dd>{formatINR(b.taxAmount - (b.addonTaxAmount || 0))}</dd></>)}
         {b.addonTaxAmount > 0 && (<><dt>GST on add-ons</dt><dd>{formatINR(b.addonTaxAmount)}</dd></>)}
         {b.convenienceFee > 0 && (<><dt>Convenience fee</dt><dd>{formatINR(b.convenienceFee)}</dd></>)}

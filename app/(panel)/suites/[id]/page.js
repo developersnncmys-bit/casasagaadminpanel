@@ -7,12 +7,13 @@ import { DeleteButton, Field, ImageField, ImageListEditor, ListEditor, Loading, 
 import { useToast } from "@/components/Toast";
 import { api, useCollection, useSettings } from "@/lib/api";
 import { slugify } from "@/lib/slug";
-import { fullName } from "@/lib/format";
+import { formatINR, fullName } from "@/lib/format";
+import DateInput from "@/components/DateInput";
 import { checkNumber, checkText, collect } from "@/lib/validate";
 
 const EMPTY = {
   id: "", name: "", mood: "", tag: "", price: "", img: "", accent: "#d8b56a", size: "", guests: "2 guests",
-  inventory: 1, includedGuests: 2, maxGuests: 4, extraGuestPrice: 0, blurb: "", story: "", features: [], amenities: [], gallery: [], active: true,
+  inventory: 1, includedGuests: 2, maxGuests: 4, extraGuestPrice: 0, discountType: "percent", discountValue: 0, discountLabel: "", discountUntil: "", blurb: "", story: "", features: [], amenities: [], gallery: [], active: true,
 };
 
 export default function SuiteEditor() {
@@ -73,6 +74,11 @@ export default function SuiteEditor() {
       taxRate: checkNumber(form.taxRate, { min: 0, max: 100, optional: true, label: "GST %" }),
       blurb: checkText(form.blurb, { max: 300, label: "short description" }),
       story: checkText(form.story, { max: 2000, label: "story" }),
+      discountValue:
+        form.discountType === "flat"
+          ? checkNumber(form.discountValue, { min: 0, max: Math.max(0, Number(form.price) - 1), optional: true, label: "discount" })
+          : checkNumber(form.discountValue, { min: 0, max: 90, optional: true, label: "discount %" }),
+      discountLabel: checkText(form.discountLabel, { max: 40, label: "offer name" }),
     });
     if (isNew && !slugify(form.id)) err.id = "Enter a URL name.";
     if (isNew && items.some((s) => s.id === slugify(form.id))) err.id = "Another suite already uses this URL.";
@@ -83,7 +89,7 @@ export default function SuiteEditor() {
     setBusy(true);
     try {
       const { __idTouched, ...data } = form;
-      const saved = await save({ ...data, id: isNew ? slugify(form.id) : form.id, price: Number(form.price), inventory: Math.max(1, Number(form.inventory) || 1), includedGuests: Math.max(1, Number(form.includedGuests) || 2), maxGuests: Math.max(1, Number(form.maxGuests) || 4), extraGuestPrice: Math.max(0, Number(form.extraGuestPrice) || 0), taxRate: form.taxRate === "" || form.taxRate == null ? null : Number(form.taxRate), location: form.location || locations[0]?.id }, { create: isNew });
+      const saved = await save({ ...data, id: isNew ? slugify(form.id) : form.id, price: Number(form.price), inventory: Math.max(1, Number(form.inventory) || 1), includedGuests: Math.max(1, Number(form.includedGuests) || 2), maxGuests: Math.max(1, Number(form.maxGuests) || 4), extraGuestPrice: Math.max(0, Number(form.extraGuestPrice) || 0), discountValue: Math.max(0, Number(form.discountValue) || 0), discountLabel: (form.discountLabel || "").trim(), taxRate: form.taxRate === "" || form.taxRate == null ? null : Number(form.taxRate), location: form.location || locations[0]?.id }, { create: isNew });
       toast(isNew ? `${fullName(saved.name)} added.` : "Suite saved.");
       setSavedAs(JSON.stringify({ ...EMPTY, ...saved }));
       if (isNew) router.replace(`/suites/${saved.id}`);
@@ -129,7 +135,7 @@ export default function SuiteEditor() {
               </div>
             </Field>
             <Field label="Size" error={errors.size}>
-              <input value={form.size} onChange={set("size")} placeholder="65 sq. m." />
+              <input value={form.size} onChange={set("size")} placeholder="860 sq ft" />
             </Field>
             <Field label="Guests included in the price" error={errors.includedGuests} hint="The nightly price covers this many guests">
               <input type="number" min="1" max="10" value={form.includedGuests ?? 2} onChange={set("includedGuests")} />
@@ -139,6 +145,21 @@ export default function SuiteEditor() {
             </Field>
             <Field label="Extra guest charge (₹ per night)" error={errors.extraGuestPrice} hint="For each guest over those included, plus the suite's GST">
               <input type="number" min="0" step="1" value={form.extraGuestPrice ?? 0} onChange={set("extraGuestPrice")} />
+            </Field>
+            <Field label="Offer / discount" error={errors.discountValue} hint={Number(form.discountValue) > 0 ? `Guests pay ₹${formatINR(Math.max(0, form.discountType === "flat" ? Number(form.price) - Number(form.discountValue) : Number(form.price) * (1 - Number(form.discountValue) / 100)))} a night instead of ₹${formatINR(Number(form.price) || 0)} (+ GST)` : "0 = no offer. Comes off the nightly base fee, before GST"}>
+              <div className="color-field">
+                <input type="number" min="0" step="1" value={form.discountValue ?? 0} onChange={set("discountValue")} />
+                <select value={form.discountType || "percent"} onChange={set("discountType")} style={{ width: "auto" }}>
+                  <option value="percent">% off</option>
+                  <option value="flat">₹ off per night</option>
+                </select>
+              </div>
+            </Field>
+            <Field label="Offer name (optional)" error={errors.discountLabel} hint="Shown with the offer, e.g. Diwali offer, Weekday special">
+              <input value={form.discountLabel || ""} onChange={set("discountLabel")} maxLength={40} placeholder="Diwali offer" />
+            </Field>
+            <Field label="Offer ends (optional)" hint={form.discountUntil ? "Last check-in date the offer covers" : "Leave empty to run until you set it to 0"}>
+              <DateInput value={form.discountUntil || ""} onChange={set("discountUntil")} />
             </Field>
             <Field label="Location" hint="Which property this suite is at">
               <select value={form.location || locations[0]?.id || ""} onChange={set("location")}>

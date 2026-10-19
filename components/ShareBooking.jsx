@@ -37,7 +37,7 @@ function bookingMessage(b, settings, location, invoiceUrl) {
     `Base fee (${plural(b.nights || 0, "night")} × ${formatINR(b.rate)}): ${formatINR(b.roomTotal)}`,
     b.extraGuestTotal > 0 && `Extra guest${b.extraGuests > 1 ? `s (${b.extraGuests})` : ""} (${plural(b.nights || 0, "night")} × ${formatINR(b.extraGuestRate)}): ${formatINR(b.extraGuestTotal)}`,
     b.addonTotal > 0 && `Add-ons: ${formatINR(b.addonTotal)}`,
-    b.discount > 0 && `Discount: − ${formatINR(b.discount)}`,
+    b.discount > 0 && `Discount${b.discountNote ? ` (${b.discountNote})` : ""}: − ${formatINR(b.discount)}`,
     stayTax > 0 && `GST on stay (${b.taxRate}%): ${formatINR(stayTax)}`,
     b.addonTaxAmount > 0 && `GST on add-ons: ${formatINR(b.addonTaxAmount)}`,
     b.convenienceFee > 0 && `Convenience fee: ${formatINR(b.convenienceFee)}`,
