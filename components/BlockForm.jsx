@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Field, Modal } from "./ui";
+import DateInput from "./DateInput";
 import { byOrder, fmtDate, fullName, todayISO } from "@/lib/format";
 
 /** "All suites & flats" / "Banashankari 6th Stage (all)" / "Tulum Suite, Riviera Suite" — with "2 rooms of" when partial */
@@ -90,10 +91,10 @@ export default function BlockForm({ initial, suites, locations, onSave, onClose 
     >
       <form id="block-form" onSubmit={submit} className="form-grid" noValidate>
         <Field label="First night">
-          <input type="date" value={form.from} onChange={set("from")} />
+          <DateInput value={form.from} onChange={set("from")} />
         </Field>
         <Field label="Last night" hint={nights > 0 ? `${nights} night${nights === 1 ? "" : "s"} — guests can still check out on ${fmtDate(form.from)} and check in after ${fmtDate(form.to)}` : ""}>
-          <input type="date" value={form.to} min={form.from} onChange={set("to")} />
+          <DateInput value={form.to} min={form.from} onChange={set("to")} />
         </Field>
 
         <Field label="Block" full>

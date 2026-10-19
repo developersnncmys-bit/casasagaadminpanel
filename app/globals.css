@@ -736,3 +736,13 @@ textarea { resize: vertical; }
 .block-picks { display: grid; gap: 0.8rem; }
 .block-pick-group { display: grid; gap: 0.35rem; }
 .block-picks .check { display: inline-flex; flex-direction: column; align-items: flex-start; }
+
+/* date boxes that read dd/mm/yyyy (components/DateInput.jsx) */
+.date-input { position: relative; display: block; }
+.date-input input { width: 100%; color: transparent; cursor: pointer; }
+.date-input input::-webkit-datetime-edit { color: transparent; }
+.date-input input::-webkit-calendar-picker-indicator { cursor: pointer; }
+.date-input .date-shown { position: absolute; left: var(--date-pad, 0.8rem); top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--ink); white-space: nowrap; }
+.date-input.is-empty .date-shown { color: var(--muted); }
+.range-nav .date-input { display: inline-block; width: 9.5rem; --date-pad: 0.7rem; }
+@media (max-width: 860px) { .range-nav .date-input { flex: 1 1 40%; width: auto; } }

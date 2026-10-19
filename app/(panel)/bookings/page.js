@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import { api, useCollection, useSettings } from "@/lib/api";
 import { downloadInvoice } from "@/lib/invoice";
 import ShareBooking from "@/components/ShareBooking";
+import DateInput from "@/components/DateInput";
 import Pagination, { usePaged } from "@/components/Pagination";
 import { checkEmail, checkName, checkNumber, checkPhone, checkText, collect } from "@/lib/validate";
 import {
@@ -106,7 +107,9 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
   const b = bill(form, suites.find((s) => s.id === form.suite), settings.invoice);
 
   const set = (k) => (e) => {
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+    // Phone keeps digits only (10 at most, a pasted +91 / 0 dropped); name keeps letters, spaces and . ' -
+    const v = k === "phone" ? e.target.value.replace(/\D/g, "").replace(/^(91|0)(?=\d{10})/, "").slice(0, 10) : k === "name" ? e.target.value.replace(/[^\p{L}\p{M} .'-]/gu, "").slice(0, 80) : e.target.value;
+    setForm((f) => ({ ...f, [k]: v }));
     setErrors((er) => ({ ...er, [k]: undefined }));
   };
   // New dates bring the fee back to automatic
@@ -198,7 +201,7 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
             <input value={form.name} onChange={set("name")} autoFocus={isNew} maxLength={80} />
           </Field>
           <Field label="Phone" error={errors.phone}>
-            <input type="tel" inputMode="tel" maxLength={16} value={form.phone} onChange={set("phone")} placeholder="10-digit mobile number" />
+            <input type="tel" inputMode="numeric" value={form.phone} onChange={set("phone")} onBlur={() => setErrors((er) => ({ ...er, phone: checkPhone(form.phone) || undefined }))} placeholder="10-digit mobile number" />
           </Field>
           <Field label="Email (optional)" error={errors.email} hint="The confirmation email goes here">
             <input type="email" value={form.email} onChange={set("email")} />
@@ -214,10 +217,10 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
         <h3 className="form-section">Stay</h3>
         <div className="form-grid">
           <Field label="Check-in" error={errors.checkIn}>
-            <input type="date" value={form.checkIn} onChange={setDate("checkIn")} />
+            <DateInput value={form.checkIn} onChange={setDate("checkIn")} />
           </Field>
           <Field label="Check-out" error={errors.checkOut}>
-            <input type="date" value={form.checkOut} min={form.checkIn || undefined} onChange={setDate("checkOut")} />
+            <DateInput value={form.checkOut} min={form.checkIn || undefined} onChange={setDate("checkOut")} />
           </Field>
           <Field label="Suite" error={errors.suite} hint={avail ? "Rooms free for these dates are shown" : "Pick dates to see what's free"}>
             <select value={form.suite} onChange={chooseSuite}>

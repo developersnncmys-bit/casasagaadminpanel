@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
+import DateInput from "@/components/DateInput";
 import { Loading, PageHeader } from "@/components/ui";
 import { useCollection, useSettings } from "@/lib/api";
 import { BOOKING_STATUSES, addDays, holdsRoom, byOrder, fmtDate, formatINR, statusLabel, todayISO } from "@/lib/format";
@@ -113,7 +114,7 @@ export default function Availability() {
           <button className="icon-btn" onClick={() => setStart(addDays(start, -DAYS))} aria-label="Previous two weeks">‹</button>
           <strong className="av-range">{rangeTitle(days[0], days[DAYS - 1])}</strong>
           <button className="icon-btn" onClick={() => setStart(addDays(start, DAYS))} aria-label="Next two weeks">›</button>
-          <input type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} aria-label="Start date" />
+          <DateInput value={start} onChange={(e) => e.target.value && setStart(e.target.value)} aria-label="Start date" />
           <button className="btn btn-ghost btn-sm" onClick={() => setStart(today)}>Today</button>
         </div>
       </PageHeader>
