@@ -2,7 +2,7 @@
 
 Next.js admin panel for the CasaSaga website. It manages bookings, enquiries and everything the website shows.
 
-- **API:** [casasagabackend](https://github.com/developersnncmys-bit/casasagabackend) (Node.js + Express + MongoDB), deployed at https://casasagabackend.vercel.app
+- **API:** [casasagabackend](https://github.com/developersnncmys-bit/casasagabackend) (Node.js + Express + MongoDB), live at https://api.casasaga.in
 - **Website:** `casasagawebsite`, which reads its content from the same API
 
 ## Run it
@@ -17,7 +17,7 @@ Sign in with the admin account created by the backend's seed (`SEED_ADMIN_EMAIL`
 
 | Variable | |
 | --- | --- |
-| `NEXT_PUBLIC_API_URL` | The API: `https://casasagabackend.vercel.app`, or `http://localhost:5000` for a local backend |
+| `NEXT_PUBLIC_API_URL` | The API: `https://api.casasaga.in`, or `http://localhost:5000` for a local backend |
 | `NEXT_PUBLIC_SITE_URL` | The website (default `https://casasagawebsite.vercel.app`). Its images (`/images/...`) are shown from here, and "View website" links to it. Use `http://localhost:3000` when running the website locally |
 
 ## Pages
