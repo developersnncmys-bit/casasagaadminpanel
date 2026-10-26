@@ -615,10 +615,21 @@ function Bookings() {
     const term = q.trim().toLowerCase();
     return items
       .filter((b) => status === "all" || b.status === status)
-      .filter((b) => when === "all" || (when === "upcoming" ? b.checkOut >= today : b.checkOut < today))
+      // Today: arriving, staying or leaving today · Upcoming: arriving after today · Past: left before today
+      .filter((b) =>
+        when === "today" ? b.checkIn <= today && today <= b.checkOut
+        : when === "upcoming" ? b.checkIn > today
+        : when === "past" ? b.checkOut < today
+        : true,
+      )
       .filter((b) => source === "all" || (b.source || "website") === source)
       .filter((b) => !term || [b.name, b.phone, b.email, b.ref, b.invoiceNo].some((v) => (v || "").toLowerCase().includes(term)))
-      .sort((a, b) => (when === "upcoming" ? a.checkIn.localeCompare(b.checkIn) : (b.createdAt || "").localeCompare(a.createdAt || "")));
+      // Today / Upcoming: soonest check-in first · Past: most recent stay first · otherwise newest booking first
+      .sort((a, b) =>
+        when === "today" || when === "upcoming" ? a.checkIn.localeCompare(b.checkIn)
+        : when === "past" ? b.checkOut.localeCompare(a.checkOut)
+        : (b.createdAt || "").localeCompare(a.createdAt || ""),
+      );
   }, [items, status, when, source, q]);
   // 10 per page by default; any filter change goes back to page 1
   const { rows: pageRows, pager } = usePaged(list, { resetOn: [status, when, source, q] });
@@ -669,7 +680,8 @@ function Bookings() {
           </select>
           <select value={when} onChange={(e) => setWhen(e.target.value)} className="select-sm">
             <option value="all">Any dates</option>
-            <option value="upcoming">Upcoming & current</option>
+            <option value="today">Today</option>
+            <option value="upcoming">Upcoming</option>
             <option value="past">Past stays</option>
           </select>
           <div className="search">
