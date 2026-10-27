@@ -615,9 +615,9 @@ function Bookings() {
     const term = q.trim().toLowerCase();
     return items
       .filter((b) => status === "all" || b.status === status)
-      // Today: arriving, staying or leaving today · Upcoming: arriving after today · Past: left before today
+      // Today: checking in today · Upcoming: checking in after today · Past: left before today
       .filter((b) =>
-        when === "today" ? b.checkIn <= today && today <= b.checkOut
+        when === "today" ? b.checkIn === today
         : when === "upcoming" ? b.checkIn > today
         : when === "past" ? b.checkOut < today
         : true,
@@ -665,7 +665,7 @@ function Bookings() {
 
       <div className="toolbar">
         <div className="tabs">
-          {[{ id: "all", label: "All" }, ...BOOKING_STATUSES].map((s) => (
+          {[{ id: "all", label: "All" }, ...BOOKING_STATUSES.filter((s) => s.id !== "pending" || count("pending") > 0)].map((s) => (
             <button key={s.id} className={`tab ${status === s.id ? "active" : ""}`} onClick={() => setStatus(s.id)}>
               {s.label} <span className="tab-count">{count(s.id)}</span>
             </button>
@@ -680,7 +680,7 @@ function Bookings() {
           </select>
           <select value={when} onChange={(e) => setWhen(e.target.value)} className="select-sm">
             <option value="all">Any dates</option>
-            <option value="today">Today</option>
+            <option value="today">Check-in today</option>
             <option value="upcoming">Upcoming</option>
             <option value="past">Past stays</option>
           </select>

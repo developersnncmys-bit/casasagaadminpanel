@@ -13,7 +13,7 @@ import { checkNumber, checkText, collect } from "@/lib/validate";
 
 const EMPTY = {
   id: "", name: "", mood: "", tag: "", price: "", img: "", accent: "#d8b56a", size: "", guests: "2 guests",
-  inventory: 1, includedGuests: 2, maxGuests: 4, extraGuestPrice: 0, discountType: "percent", discountValue: 0, discountLabel: "", discountUntil: "", blurb: "", story: "", features: [], amenities: [], gallery: [], active: true,
+  inventory: 1, includedGuests: 2, maxGuests: 4, extraGuestPrice: 0, discountType: "percent", discountValue: 0, discountLabel: "", discountUntil: "", checkInTime: "14:00", checkOutTime: "11:00", blurb: "", story: "", features: [], amenities: [], gallery: [], active: true,
 };
 
 export default function SuiteEditor() {
@@ -170,6 +170,12 @@ export default function SuiteEditor() {
             </Field>
             <Field label="Rooms of this type" error={errors.inventory} hint="How many guests can book this suite for the same night">
               <input type="number" min="1" max="50" value={form.inventory ?? 1} onChange={set("inventory")} />
+            </Field>
+            <Field label="Check-in time" hint="Guests can check in from this time — shown on the booking page and in the confirmation email">
+              <input type="time" step="900" value={form.checkInTime || ""} onChange={set("checkInTime")} />
+            </Field>
+            <Field label="Check-out time" hint="Guests check out by this time">
+              <input type="time" step="900" value={form.checkOutTime || ""} onChange={set("checkOutTime")} />
             </Field>
             <Field label="GST (%)" error={errors.taxRate} hint="Leave empty to use the default from Contact & policies → Invoices & pricing">
               <input type="number" min="0" max="100" step="0.01" value={form.taxRate ?? ""} onChange={set("taxRate")} placeholder="Default" />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Icon from "./Icon";
 import { api, setToken } from "@/lib/api";
-import { SITE_URL, unpaidExpired } from "@/lib/format";
+import { SITE_URL, awaitingPayment } from "@/lib/format";
 
 const NAV = [
   { group: "Overview", items: [{ href: "/", label: "Dashboard", icon: "dashboard" }] },
@@ -36,7 +36,7 @@ export default function Sidebar() {
   useEffect(() => {
     setOpen(false);
     api("/api/bookings")
-      .then((b) => setCounts({ bookings: b.filter((x) => x.status === "pending" && !unpaidExpired(x)).length }))
+      .then((b) => setCounts({ bookings: b.filter((x) => x.status === "pending" && !awaitingPayment(x)).length }))
       .catch(() => {});
   }, [path]);
 

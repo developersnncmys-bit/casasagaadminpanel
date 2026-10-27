@@ -4,7 +4,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { Badge, Loading, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
-import { BOOKING_STATUSES, EARNING, SOURCE_INFO, STATUS_TONE, sourceLabel, fmtDate, fmtDateTime, formatINR, fullName, imgSrc, nightsBetween, statusLabel, todayISO, unpaidExpired } from "@/lib/format";
+import { BOOKING_STATUSES, EARNING, SOURCE_INFO, STATUS_TONE, sourceLabel, fmtDate, fmtDateTime, formatINR, fullName, imgSrc, nightsBetween, statusLabel, todayISO, unpaidExpired, awaitingPayment } from "@/lib/format";
 
 
 export default function Dashboard() {
@@ -20,7 +20,9 @@ export default function Dashboard() {
 
   if (!data) return <Loading error={error} />;
 
-  const { bookings, suites, addons, gallery } = data;
+  const { suites, addons, gallery } = data;
+  // Unpaid website bookings aren't shown until the guest pays
+  const bookings = data.bookings.filter((b) => !awaitingPayment(b));
   const today = todayISO();
   const month = today.slice(0, 7);
   const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
@@ -54,7 +56,7 @@ export default function Dashboard() {
       <PageHeader title="Dashboard" subtitle="Bookings, guests and website at a glance" />
 
       <section className="stats">
-        {stats.map((s) => (
+        {stats.filter((s) => s.label !== "Pending requests" || s.value > 0).map((s) => (
           <Link key={s.label} href={s.href} className="stat">
             <span className="stat-icon">
               <Icon name={s.icon} />
