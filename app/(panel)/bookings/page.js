@@ -107,8 +107,8 @@ function BookingForm({ initial, suites, addons, settings, onSave, onClose, onDel
   const b = bill(form, suites.find((s) => s.id === form.suite), settings.invoice);
 
   const set = (k) => (e) => {
-    // Phone keeps digits only (10 at most, a pasted +91 / 0 dropped); name keeps letters, spaces and . ' -
-    const v = k === "phone" ? e.target.value.replace(/\D/g, "").replace(/^(91|0)(?=\d{10})/, "").slice(0, 10) : k === "name" ? e.target.value.replace(/[^\p{L}\p{M} .'-]/gu, "").slice(0, 80) : e.target.value;
+    // Phone keeps digits only (10 at most, a pasted +91 / 0 dropped); name keeps letters, numbers, spaces and . ' -
+    const v = k === "phone" ? e.target.value.replace(/\D/g, "").replace(/^(91|0)(?=\d{10})/, "").slice(0, 10) : k === "name" ? e.target.value.replace(/[^\p{L}\p{M}\p{N} .'-]/gu, "").slice(0, 80) : e.target.value;
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((er) => ({ ...er, [k]: undefined }));
   };
