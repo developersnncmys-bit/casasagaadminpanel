@@ -582,7 +582,7 @@ function Bookings() {
   const router = useRouter();
   const params = useSearchParams();
   const toast = useToast();
-  const { items, setItems, error, save, remove } = useCollection("bookings");
+  const { items, setItems, error, load, save, remove } = useCollection("bookings");
   const { items: suites } = useCollection("suites");
   const { items: addons } = useCollection("addons");
   const { settings } = useSettings();
@@ -592,8 +592,24 @@ function Bookings() {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [checking, setChecking] = useState(false);
 
   const ready = items && suites && addons && settings;
+
+  // Ask Razorpay about website bookings still waiting for payment; paid ones are confirmed and appear here
+  // (the server also does this by itself every few minutes)
+  const checkPayments = async () => {
+    setChecking(true);
+    try {
+      const { confirmed } = await api("/api/bookings/check-payments", { method: "POST" });
+      if (confirmed) await load();
+      toast(confirmed ? `${confirmed} paid booking${confirmed === 1 ? "" : "s"} found in Razorpay and confirmed.` : "All payments are up to date — nothing new paid in Razorpay.");
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setChecking(false);
+    }
+  };
 
   // Deep links: ?new=1[&suite=&checkIn=] from the dashboard / availability, ?open=<id>
   useEffect(() => {
@@ -658,6 +674,9 @@ function Bookings() {
   return (
     <>
       <PageHeader title="Bookings" subtitle="Click a booking to see everything about it">
+        <button className="btn btn-ghost" onClick={checkPayments} disabled={checking} title="Find website bookings that were paid in Razorpay but not yet marked paid">
+          <Icon name="rupee" size={16} /> {checking ? "Checking Razorpay…" : "Check payments"}
+        </button>
         <button className="btn btn-gold" onClick={() => setEditing({ ...EMPTY, checkIn: todayISO() })}>
           <Icon name="plus" size={16} /> New booking
         </button>
